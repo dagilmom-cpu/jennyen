@@ -3,7 +3,7 @@ import requests
 import re
 import base64
 
-# --- [1] 럭셔리 호피 디자인 설정 ---
+# --- [1] 디자인 & 설정 (변경 없음) ---
 st.set_page_config(page_title="제니쌤 영어 VIP", page_icon="🐆")
 st.markdown("""
     <style>
@@ -25,20 +25,26 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
+# 🔊 소리 재생 함수 (가장 확실한 HTML5 방식)
 def autoplay_audio(audio_bytes):
     b64 = base64.b64encode(audio_bytes).decode()
-    md = f'<audio autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
+    # playsinline과 controls 없이 숨겨진 오디오 태그로 자동 재생 유도
+    md = f"""
+        <audio autoplay="true" style="display:none;">
+            <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
+        </audio>
+    """
     st.markdown(md, unsafe_allow_html=True)
 
 st.title("🐆 제니쌤 영어 VIP")
 
-# --- [2] API 설정 (Secrets 안전 연동) ---
+# --- [2] API 설정 (최신 키 반영) ---
 try:
-    CLAUDE_API_KEY = st.secrets["CLAUDE_API_KEY"]
-    ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
-    VOICE_ID = st.secrets["VOICE_ID"]
+    CLAUDE_API_KEY = st.secrets.get("CLAUDE_API_KEY", "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").strip()
+    ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "sk_6de3761d943fe084486efb94676a26daab9fc28640b57951").strip()
+    VOICE_ID = st.secrets.get("VOICE_ID", "07njSdfuJRf0H4s0EQeo")
 except Exception:
-    st.warning("Secrets 설정 확인이 필요해요! 🔓")
+    st.error("API 키 설정 확인이 필요해 언니! 🔓")
     st.stop()
 
 if "messages" not in st.session_state:
@@ -49,25 +55,25 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # --- [3] 입력창 ---
-prompt = st.chat_input("Hi Jenny! (최신 Sonnet 4.6으로 대화해요!)")
+prompt = st.chat_input("Hi Jenny! (제니랑 영어로 수다 떨자!)")
 
-# --- [4] 대화 로직 (언니가 알려준 최신 모델명 적용) ---
+# --- [4] 대화 로직 (모델명: claude-sonnet-4-6 유지) ---
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     try:
-        with st.spinner("제니가 최신상 뇌(Sonnet 4.6)로 생각 중... 🥂"):
+        with st.spinner("제니가 생각 중... 🥂"):
             claude_url = "https://api.anthropic.com/v1/messages"
             claude_headers = {
-                "x-api-key": CLAUDE_API_KEY.strip(),
+                "x-api-key": CLAUDE_API_KEY,
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json"
             }
             
             claude_data = {
-                "model": "claude-sonnet-4-6", # ⭐ 언니가 알려준 2026년 무적의 모델명!
+                "model": "claude-sonnet-4-6", 
                 "max_tokens": 1024,
                 "system": """너는 24세 재미교포 제니야. 힙하고 친절한 MZ 선생님이지. 
                 1. 한 줄 영어 대화. (첫 인사만 한국어 가능)
@@ -77,7 +83,7 @@ if prompt:
                 "messages": st.session_state.messages
             }
             
-            response = requests.post(claude_url, headers=claude_headers, json=claude_data, timeout=15)
+            response = requests.post(claude_url, headers=claude_headers, json=claude_data, timeout=20)
             res_json = response.json()
 
             if "content" in res_json:
@@ -85,19 +91,28 @@ if prompt:
                 with st.chat_message("assistant"):
                     st.markdown(answer)
                     
+                    # 💡 한국어/슬랭 설명 제외하고 영어만 추출
                     voice_text = re.sub(r'\[Slang:.*?\]', '', answer).strip()
                     voice_text = re.sub(r'[ㄱ-ㅎㅏ-ㅣ가-힣]+', '', voice_text).strip()
                     
                     if voice_text:
                         el_url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
-                        el_headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVENLABS_API_KEY.strip()}
+                        el_headers = {
+                            "Accept": "audio/mpeg", 
+                            "Content-Type": "application/json", 
+                            "xi-api-key": ELEVENLABS_API_KEY
+                        }
                         v_res = requests.post(el_url, headers=el_headers, json={"text": voice_text, "model_id": "eleven_multilingual_v2"})
+                        
                         if v_res.status_code == 200:
+                            # 🔊 수정된 자동 재생 함수 호출
                             autoplay_audio(v_res.content)
+                        else:
+                            st.warning(f"목소리 엔진 오류: {v_res.status_code}")
                 
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             else:
-                st.error(f"제니의 진단 결과: {res_json.get('error', {}).get('message', '네트워크나 키를 확인해줘!')}")
+                st.error(f"제니 진단: {res_json.get('error', {}).get('message', '연결 확인!')}")
 
     except Exception as e:
         st.error(f"시스템 오류: {e}")
