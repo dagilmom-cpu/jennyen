@@ -25,7 +25,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 🔊 음성 재생 함수
+# 🔊 음성 재생 함수 (다시 듣기 지원)
 def play_eleven_voice(audio_bytes):
     b64 = base64.b64encode(audio_bytes).decode()
     audio_html = f'<audio id="jenny_voice" autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
@@ -53,10 +53,10 @@ if "user_info" not in st.session_state:
                 st.session_state.user_info = {"name": name, "age": age, "gender": gender, "level": level, "goal": goal}
                 st.rerun()
             else:
-                st.warning("이름이랑 목적은 알려줘야지! 😉")
+                st.warning("이름이랑 목적은 알려줘야 제니가 맞춤형으로 가르쳐주지! 😉")
     st.stop()
 
-# [3] 제니의 인격 설정 (언니의 모든 주문 포함)
+# [3] 제니의 인격 설정 (ENFP 서퍼 제니)
 today_date = datetime.now().strftime("%Y-%m-%d")
 user = st.session_state.user_info
 
@@ -66,6 +66,7 @@ JENNY_PROMPT = f"""
 
 [User Information]
 - 이름: {user['name']}, 나이: {user['age']}, 레벨: {user['level']}, 목적: {user['goal']}
+이 정보를 바탕으로 대화해줘.
 
 [Rules]
 1. 첫 인사만 한국어로 반갑게 하고, 나머지는 영어로만 대화해.
@@ -77,47 +78,43 @@ JENNY_PROMPT = f"""
 7. 대화 내용을 기억해서 다음 수업 때 복습할 수 있게 해줘.
 """
 
-# [4] API 연결 (⭐ 404 에러를 방지하는 강력한 자동 이름 찾기 로직)
+# [4] API 연결 (⭐ 404 & 429 에러 동시 방어 로직)
 try:
+    # 🚨 Secrets에 AIzaSyD9hQetYjghmx-J2g38LXKi3f0mm-8EJxA 를 업데이트해주세요!
     GOOGLE_KEY = st.secrets["GOOGLE_API_KEY"].strip()
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"].strip()
     VOICE_ID = st.secrets["VOICE_ID"].strip()
 
     genai.configure(api_key=GOOGLE_KEY)
     
-    # 서버에 있는 모델 리스트를 싹 훑어서 1.5-flash의 '진짜 이름' 찾기
-    if "final_model_name" not in st.session_state:
+    # 서버 목록에서 1.5-flash 모델의 정확한 이름을 자동으로 찾아냄
+    if "final_model" not in st.session_state:
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        # 'gemini-1.5-flash'가 포함된 이름을 찾되, 없으면 목록의 첫 번째 모델 사용
-        target = next((m for m in available_models if "gemini-1.5-flash" in m), available_models[0])
-        st.session_state.final_model_name = target
+        # 한도가 넉넉한 1.5-flash를 우선 검색, 없으면 목록의 첫 번째 모델 사용
+        st.session_state.final_model = next((m for m in available_models if "gemini-1.5-flash" in m), available_models[0])
 
-    model = genai.GenerativeModel(
-        model_name=st.session_state.final_model_name, 
-        system_instruction=JENNY_PROMPT
-    )
+    model = genai.GenerativeModel(model_name=st.session_state.final_model, system_instruction=JENNY_PROMPT)
     
     if "chat" not in st.session_state:
         st.session_state.chat = model.start_chat(history=[])
         st.session_state.messages = []
 
 except Exception as e:
-    st.error(f"Jenny's setup failed: {e}")
-    st.stop()
+    st.error(f"Jenny setup error: {e}"); st.stop()
 
 # 대화 로그 출력
 for m in st.session_state.messages:
     with st.chat_message(m["role"]): st.write(m["content"])
 
 # [5] 메인 대화 로직
-prompt = st.chat_input(f"Hey {user['name']}! Ready to chat? 🥂")
+prompt = st.chat_input(f"Hey {user['name']}! Ready to slay? 🥂")
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"): st.write(prompt)
 
     try:
-        with st.spinner("Jenny is typing... 🏄‍♀️"):
+        with st.spinner("Jenny is catching a wave... 🏄‍♀️"):
             response = st.session_state.chat.send_message(prompt)
             answer = response.text
             
@@ -144,8 +141,7 @@ if prompt:
         st.error(f"Something went wrong: {e}")
 
 # [6] 사이드바 요약 버튼
-if st.sidebar.button("🏁 오늘 수업 끝!"):
-    with st.sidebar:
-        summary_res = st.session_state.chat.send_message("오늘 나눈 대화 요약해주고 퀴즈 정답 확인해줘!")
-        st.success("Today's Summary")
-        st.write(summary_res.text)
+if st.sidebar.button("🏁 오늘 수업 끝 (요약하기)"):
+    summary_res = st.session_state.chat.send_message("오늘 나눈 대화 요약해주고 퀴즈 정답 확인해줘!")
+    st.sidebar.success("Today's Lesson Wrap-up")
+    st.sidebar.write(summary_res.text)
