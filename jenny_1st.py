@@ -28,7 +28,7 @@ if "user_info" not in st.session_state:
         
         col1, col2 = st.columns(2)
         with col1:
-            name = st.text_input("Name", placeholder="언니 이름이 뭐야?")
+            name = st.text_input("Name", placeholder="이름이 뭐야?")
             age = st.number_input("Age", min_value=0, max_value=100, value=25)
         with col2:
             gender = st.selectbox("Gender", ["Female", "Male", "Secret"])
@@ -41,7 +41,7 @@ if "user_info" not in st.session_state:
                 st.session_state.user_info = {"name": name, "age": age, "gender": gender, "level": level, "goal": goal}
                 st.rerun()
             else:
-                st.warning("이름이랑 목적은 꼭 알려줘 언니! 😉")
+                st.warning("이름이랑 목적은 꼭 알려줘! 😉")
     st.stop()
 
 # [3] 제니의 인격 및 지침 설정
