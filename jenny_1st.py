@@ -4,7 +4,7 @@ import requests
 import re
 import base64
 
-# --- [1] 럭셔리 호피 디자인 설정 ---
+# --- [1] 럭셔리 호피 디자인 (제니쌤 시그니처) ---
 st.set_page_config(page_title="제니쌤 영어 VIP", page_icon="🐆")
 st.markdown("""
     <style>
@@ -26,70 +26,63 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 🔊 강력한 오디오 재생 함수
+# 🔊 사운드 자동 재생 함수
 def autoplay_audio(audio_bytes):
     b64 = base64.b64encode(audio_bytes).decode()
-    audio_html = f"""
-        <audio id="jenny_voice" autoplay="true" style="display:none;">
-            <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
-        </audio>
-        <script>
-            var audio = document.getElementById('jenny_voice');
-            audio.play().catch(e => console.log("Autoplay blocked: " + e));
-        </script>
-    """
+    audio_html = f'<audio autoplay="true" style="display:none;"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
     st.markdown(audio_html, unsafe_allow_html=True)
 
 st.title("🐆 제니쌤 영어 VIP (Gemini)")
 
-# --- [2] API 설정 (언니의 새로운 키들 반영) ---
-# 구글 키와 일레븐랩스 키를 깨끗하게 정리해서 넣었습니다.
-GOOGLE_API_KEY = "AIzaSyBV_nrgqg7UJC-VBHBeuBw_Zxp0U7ybv-w".strip()
-ELEVEN_KEY = "sk_9665d7f430925bb8ef413175c17b94f9c74ea27f2d88b5f5".strip()
-VOICE_ID = "O7njSdfuJRf0H4s0EQeo"
+# --- [2] API 및 학습 지침 설정 ---
+GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
+VOICE_ID = st.secrets["VOICE_ID"]
 
-# Gemini 모델 설정 (가장 빠르고 저렴한 Flash 모델)
 genai.configure(api_key=GOOGLE_API_KEY)
-model = genai.GenerativeModel('gemini-1.5-flash')
 
+# ⭐ 제니의 뇌에 "최신 트렌드"와 "슬랭" 지침을 박제!
+JENNY_INSTRUCTION = """
+너는 24세 재미교포 제니야. 힙하고 친절한 MZ 선생님이지.
+1. 지금 미국 인스타, 트위터(X)에서 가장 핫한 신조어와 밈(Meme)을 적극적으로 사용해줘.
+2. 대화 중간중간 최신 팝컬처나 뉴스 이야기를 섞어서 진짜 현지인처럼 말해.
+3. 무조건 영어 한 줄 대화! (첫 인사만 한국어 가능)
+4. 슬랭이나 약어 사용 시 끝에 [Slang: 단어-뜻] 붙이기.
+5. 보이스 재생을 위해 한국어는 빼고 오직 영어만 읽어줘.
+"""
+
+model = genai.GenerativeModel(
+    model_name='gemini-1.5-flash',
+    system_instruction=JENNY_INSTRUCTION
+)
+
+# 세션 관리 (대화 기억)
+if "chat_session" not in st.session_state:
+    st.session_state.chat_session = model.start_chat(history=[])
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-# 제니의 핵심 학습 지침
-JENNY_SYSTEM_PROMPT = """너는 24세 재미교포 제니야. 힙하고 친절한 MZ 선생님이지. 
-1. 한 줄 영어 대화만 해. (첫 인사만 한국어 가능)
-2. 상대방의 이름, 나이, 직업을 물어보고 대화 중에 기억해서 불러줘.
-3. 힙한 슬랭 사용 시 끝에 [Slang: 단어-뜻] 붙이기.
-4. 보이스 재생을 위해 영어 뒤에 한국어 설명을 배치해."""
-
+# 대화 로그 출력
 for msg in st.session_state.messages:
-    with st.chat_message(msg["role"]):
-        st.markdown(msg["content"])
+    with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
-# --- [3] 입력창 ---
-prompt = st.chat_input("Hi Jenny! (공짜니까 마음껏 수다 떨자 🥂)")
+# --- [3] 메인 대화 로직 ---
+prompt = st.chat_input("Hi Jenny! 오늘 미국에서 뭐가 핫해? 🔥")
 
-# --- [4] 메인 로직 (Gemini + ElevenLabs) ---
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
-    with st.chat_message("user"):
-        st.markdown(prompt)
+    with st.chat_message("user"): st.markdown(prompt)
 
     try:
-        with st.spinner("제니가 빛의 속도로 생각 중... 🥂"):
-            # 1. Gemini 대화 요청 (이전 대화 내역 포함)
-            history = [{"role": "user" if m["role"] == "user" else "model", "parts": [m["content"]]} for m in st.session_state.messages[:-1]]
-            chat = model.start_chat(history=history)
-            
-            # 지침 주입하여 메시지 전송
-            full_prompt = f"{JENNY_SYSTEM_PROMPT}\n\nUser: {prompt}"
-            response = chat.send_message(full_prompt)
+        with st.spinner("제니가 인스타 확인 중... 🥂"):
+            # 제미나이 답변 생성
+            response = st.session_state.chat_session.send_message(prompt)
             answer = response.text
             
             with st.chat_message("assistant"):
                 st.markdown(answer)
                 
-                # 2. 음성 생성 (영어만 추출)
+                # ElevenLabs 음성 생성 (영어만)
                 v_text = re.sub(r'\[Slang:.*?\]', '', answer).strip()
                 v_text = re.sub(r'[ㄱ-ㅎㅏ-ㅣ가-힣]+', '', v_text).strip()
                 
@@ -105,4 +98,4 @@ if prompt:
             st.session_state.messages.append({"role": "assistant", "content": answer})
 
     except Exception as e:
-        st.error(f"시스템 오류 발생: {e}")
+        st.error(f"제니 긴급 상황: {e}")
