@@ -18,7 +18,7 @@ st.markdown("""
 html, body, [class*="css"], .stMarkdown, p, span, div {
     color: #000000 !important;
     font-weight: 900 !important;
-    text-shadow: -2px -2px 0 #FFF, 2px -2px 0 #FFF, -2px 2px 0 #FFF, 2px 2px 0 #FFF !important;
+    text-shadow: -2px -2px 0 #FFF, 2px -2px 0 #FFF, -2px 2px 0 #FFF, -2px 2px 0 #FFF !important;
 }
 .stChatMessage[data-testid="stChatMessageAssistant"] {
     background-color: rgba(0, 0, 0, 0.95) !important;
@@ -104,7 +104,6 @@ if prompt:
 
     try:
         with st.spinner("제니 생각중... 💭"):
-
             # Claude 요청
             c_headers = {
                 "x-api-key": CLAUDE_API_KEY,
@@ -117,30 +116,32 @@ if prompt:
 MZ 영어 선생님이고 힙하게 말해.
 {level_map[level]} 수준으로 한 줄 영어만 말해.
 슬랭 사용 시 [Slang: 단어-뜻] 붙여.
+대화 시 이름, 나이, 직업 등을 물어보고 기억하며 친근하게 대해줘.
 """
 
             c_data = {
-                "model": "claude-3-5-sonnet-latest",
+                "model": "claude-sonnet-4-6", # ⭐ 언니가 알려준 2026년 무적 모델명 적용!
                 "max_tokens": 300,
                 "system": system_prompt,
                 "messages": format_messages(st.session_state.messages)
             }
 
-            res = requests.post(
+            res_raw = requests.post(
                 "https://api.anthropic.com/v1/messages",
                 headers=c_headers,
                 json=c_data,
                 timeout=40
-            ).json()
+            )
+            res = res_raw.json()
 
             if "content" not in res:
-                st.error("Claude 응답 오류 😢")
+                st.error(f"Claude 오류: {res.get('error', {}).get('message', '연결 확인!')}")
                 st.stop()
 
             answer = res["content"][0]["text"]
 
         # ---------------------------
-        # [9] 텍스트 먼저 출력 (UX 개선)
+        # [9] 텍스트 먼저 출력
         # ---------------------------
         with st.chat_message("assistant"):
             st.markdown(answer)
@@ -148,13 +149,14 @@ MZ 영어 선생님이고 힙하게 말해.
         st.session_state.messages.append({"role": "assistant", "content": answer})
 
         # ---------------------------
-        # [10] 음성 생성 (비동기 느낌)
+        # [10] 음성 생성
         # ---------------------------
+        # 한국어와 슬랭 설명은 빼고 영어만 골라내기
         v_text = re.sub(r'\[Slang:.*?\]', '', answer).strip()
+        v_text = re.sub(r'[ㄱ-ㅎㅏ-ㅣ가-힣]+', '', v_text).strip()
 
         if v_text:
             with st.spinner("🎤 제니가 말하는 중..."):
-
                 el_url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
                 el_headers = {
                     "Accept": "audio/mpeg",
@@ -165,35 +167,25 @@ MZ 영어 선생님이고 힙하게 말해.
                 el_data = {
                     "text": v_text,
                     "model_id": "eleven_multilingual_v2",
-                    "voice_settings": {
-                        "stability": 0.4,
-                        "similarity_boost": 0.8
-                    }
+                    "voice_settings": {"stability": 0.4, "similarity_boost": 0.8}
                 }
 
-                v_res = requests.post(
-                    el_url,
-                    headers=el_headers,
-                    json=el_data,
-                    timeout=40
-                )
+                v_res = requests.post(el_url, headers=el_headers, json=el_data, timeout=40)
 
                 if v_res.status_code == 200:
-                    audio_bytes = v_res.content
-                    st.session_state.last_audio = audio_bytes
-
-                    # 🔊 안정적인 재생 방식
-                    st.audio(audio_bytes, format="audio/mp3", autoplay=True)
-
+                    st.session_state.last_audio = v_res.content
+                    # 🔊 자동 재생
+                    st.audio(v_res.content, format="audio/mp3", autoplay=True)
                 else:
-                    st.warning("음성 생성 실패 😢")
+                    st.warning(f"음성 인증 오류: {v_res.text}")
 
     except Exception as e:
         st.error(f"시스템 오류: {e}")
 
 # ---------------------------
-# [11] 다시 듣기 버튼
+# [11] 다시 듣기 버튼 (하단 고정 느낌)
 # ---------------------------
 if st.session_state.last_audio:
-    if st.button("🔊 다시 들어보기"):
+    st.divider()
+    if st.button("🔊 Last Sentence (다시 듣기)"):
         st.audio(st.session_state.last_audio, format="audio/mp3", autoplay=True)
