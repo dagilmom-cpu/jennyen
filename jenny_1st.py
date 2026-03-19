@@ -32,15 +32,10 @@ def autoplay_audio(audio_bytes):
 
 st.title("🐆 제니쌤 영어 VIP")
 
-# --- [2] API 설정 (보안 강화 버전) ---
-# Secrets에서 키를 가져오도록 수정했습니다.
-try:
-    CLAUDE_API_KEY = st.secrets["CLAUDE_API_KEY"]
-    ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
-    VOICE_ID = st.secrets.get("VOICE_ID", "O7njSdfuJRf0H4s0EQeo")
-except:
-    st.warning("API 키가 설정되지 않았습니다. Streamlit Cloud의 Secrets 설정을 확인해주세요!")
-    st.stop()
+# --- [2] API 설정 (코딩에 직접 키 입력 완료!) ---
+CLAUDE_API_KEY = "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"
+ELEVENLABS_API_KEY = "sk_6de3761d943fe084486efb94676a26daab9fc28640b57951"
+VOICE_ID = "O7njSdfuJRf0H4s0EQeo"
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -49,7 +44,7 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# --- [3] 입력창 ---
+# --- [3] 입력창 (Win+H로 말해줘!) ---
 prompt = st.chat_input("Hi Jenny! (제니랑 영어로 대화해요!)")
 
 # --- [4] 대화 로직 (작동하는 모델명으로 수정) ---
@@ -68,7 +63,7 @@ if prompt:
             }
             
             claude_data = {
-                "model": "claude-3-5-sonnet-latest", # ⭐ 실제 작동하는 최신 모델명으로 수정!
+                "model": "claude-3-5-sonnet-latest", # ⭐ 실제 작동하는 최신 모델명!
                 "max_tokens": 1024,
                 "system": """너는 24세 재미교포 제니야. 힙하고 친절한 MZ 선생님이지. 
                 1. 한 줄 영어 대화. (첫 인사만 한국어 가능)
@@ -99,7 +94,8 @@ if prompt:
                 
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             else:
-                st.error(f"제니의 긴급 진단: {res_json.get('error', {}).get('message', '연결 상태 확인!')}")
+                # 에러 메시지 상세 출력
+                st.error(f"제니의 긴급 진단: {res_json.get('error', {}).get('message', '연결 확인!')}")
 
     except Exception as e:
         st.error(f"시스템 오류: {e}")
