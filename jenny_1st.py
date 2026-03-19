@@ -3,7 +3,7 @@ import requests
 import re
 import base64
 
-# --- [1] 럭셔리 호피 디자인 설정 ---
+# --- [1] 럭셔리 호피 디자인 설정 (변경 없음) ---
 st.set_page_config(page_title="제니쌤 영어 VIP", page_icon="🐆")
 st.markdown("""
     <style>
@@ -32,11 +32,14 @@ def autoplay_audio(audio_bytes):
 
 st.title("🐆 제니쌤 영어 VIP")
 
-# --- [2] API 설정 (보안 및 최신 키 적용) ---
-# Secrets에서 가져오되, 없을 경우를 대비해 직접 입력값도 처리합니다.
-CLAUDE_API_KEY = st.secrets.get("CLAUDE_API_KEY", "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").strip()
-ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "sk_6de3761d943fe084486efb94676a26daab9fc28640b57951").strip()
-VOICE_ID = st.secrets.get("VOICE_ID", "O7njSdfuJRf0H4s0EQeo")
+# --- [2] API 설정 (스크린샷의 Secrets에서 가져오기) ---
+try:
+    CLAUDE_API_KEY = st.secrets["CLAUDE_API_KEY"]
+    ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
+    VOICE_ID = st.secrets["VOICE_ID"]
+except KeyError:
+    st.error("Secrets 설정이 필요합니다. Streamlit Settings > Secrets 칸을 확인해주세요!")
+    st.stop()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -46,16 +49,16 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # --- [3] 입력창 ---
-prompt = st.chat_input("Hi Jenny! (제니랑 영어로 수다 떨자!)")
+prompt = st.chat_input("Hi Jenny! (제니랑 영어로 대화해요!)")
 
-# --- [4] 대화 로직 (작동하는 모델명 적용) ---
+# --- [4] 대화 로직 (지침 및 모델명 유지) ---
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     try:
-        with st.spinner("제니가 최신상 뇌로 업그레이드 완료! 🥂"):
+        with st.spinner("제니가 생각 중... 🥂"):
             claude_url = "https://api.anthropic.com/v1/messages"
             claude_headers = {
                 "x-api-key": CLAUDE_API_KEY,
@@ -64,7 +67,7 @@ if prompt:
             }
             
             claude_data = {
-                "model": "claude-3-5-sonnet-latest", # ⭐ 실제 작동하는 최신 모델명으로 수정!
+                "model": "claude-3-5-sonnet-latest", # ⭐ 2026년형 무적 모델명
                 "max_tokens": 1024,
                 "system": """너는 24세 재미교포 제니야. 힙하고 친절한 MZ 선생님이지. 
                 1. 한 줄 영어 대화. (첫 인사만 한국어 가능)
@@ -82,21 +85,24 @@ if prompt:
                 with st.chat_message("assistant"):
                     st.markdown(answer)
                     
-                    # 보이스 전용 텍스트 필터링 (영어만)
+                    # 보이스 전용 텍스트 필터링 (영어만 재생)
                     voice_text = re.sub(r'\[Slang:.*?\]', '', answer).strip()
                     voice_text = re.sub(r'[ㄱ-ㅎㅏ-ㅣ가-힣]+', '', voice_text).strip()
                     
                     if voice_text:
                         el_url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
-                        el_headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVENLABS_API_KEY}
+                        el_headers = {
+                            "Accept": "audio/mpeg", 
+                            "Content-Type": "application/json", 
+                            "xi-api-key": ELEVENLABS_API_KEY
+                        }
                         v_res = requests.post(el_url, headers=el_headers, json={"text": voice_text, "model_id": "eleven_multilingual_v2"})
                         if v_res.status_code == 200:
                             autoplay_audio(v_res.content)
                 
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             else:
-                error_msg = res_json.get('error', {}).get('message', '연결 상태를 확인해줘!')
-                st.error(f"제니의 긴급 진단: {error_msg}")
+                st.error(f"제니의 긴급 진단: {res_json.get('error', {}).get('message', '연결 확인!')}")
 
     except Exception as e:
         st.error(f"시스템 오류: {e}")
