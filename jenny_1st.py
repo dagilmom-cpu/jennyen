@@ -25,7 +25,7 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 🔊 음성 재생 함수 (다시 듣기 지원)
+# 🔊 음성 재생 함수
 def play_eleven_voice(audio_bytes):
     b64 = base64.b64encode(audio_bytes).decode()
     audio_html = f'<audio id="jenny_voice" autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
@@ -50,15 +50,13 @@ if "user_info" not in st.session_state:
         
         if st.button("Start Surfing with Jenny! 🏄‍♀️"):
             if name and goal:
-                st.session_state.user_info = {
-                    "name": name, "age": age, "gender": gender, "level": level, "goal": goal
-                }
+                st.session_state.user_info = {"name": name, "age": age, "gender": gender, "level": level, "goal": goal}
                 st.rerun()
             else:
-                st.warning("이름이랑 목적은 꼭 알려줘야 제니가 맞춤형으로 가르쳐주지! 😉")
+                st.warning("이름이랑 목적은 알려줘야지! 😉")
     st.stop()
 
-# [3] 제니의 인격 및 지침 설정 (ENFP 제니 인격 유지)
+# [3] 제니의 인격 설정 (언니의 모든 주문 포함)
 today_date = datetime.now().strftime("%Y-%m-%d")
 user = st.session_state.user_info
 
@@ -68,7 +66,6 @@ JENNY_PROMPT = f"""
 
 [User Information]
 - 이름: {user['name']}, 나이: {user['age']}, 레벨: {user['level']}, 목적: {user['goal']}
-이 정보를 바탕으로 대화해줘.
 
 [Rules]
 1. 첫 인사만 한국어로 반갑게 하고, 나머지는 영어로만 대화해.
@@ -80,7 +77,7 @@ JENNY_PROMPT = f"""
 7. 대화 내용을 기억해서 다음 수업 때 복습할 수 있게 해줘.
 """
 
-# [4] API 연결 (⭐ 1.5-flash로 강제 고정하여 429 에러 방어)
+# [4] API 연결 (⭐ 404 에러를 방지하는 강력한 자동 이름 찾기 로직)
 try:
     GOOGLE_KEY = st.secrets["GOOGLE_API_KEY"].strip()
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"].strip()
@@ -88,11 +85,15 @@ try:
 
     genai.configure(api_key=GOOGLE_KEY)
     
-    # 서버가 멋대로 2.5를 쓰지 못하게 1.5-flash로 이름을 못 박음
-    model_name = 'gemini-1.5-flash'
+    # 서버에 있는 모델 리스트를 싹 훑어서 1.5-flash의 '진짜 이름' 찾기
+    if "final_model_name" not in st.session_state:
+        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
+        # 'gemini-1.5-flash'가 포함된 이름을 찾되, 없으면 목록의 첫 번째 모델 사용
+        target = next((m for m in available_models if "gemini-1.5-flash" in m), available_models[0])
+        st.session_state.final_model_name = target
 
     model = genai.GenerativeModel(
-        model_name=model_name, 
+        model_name=st.session_state.final_model_name, 
         system_instruction=JENNY_PROMPT
     )
     
@@ -101,7 +102,7 @@ try:
         st.session_state.messages = []
 
 except Exception as e:
-    st.error(f"Jenny is getting ready: {e}")
+    st.error(f"Jenny's setup failed: {e}")
     st.stop()
 
 # 대화 로그 출력
@@ -109,21 +110,19 @@ for m in st.session_state.messages:
     with st.chat_message(m["role"]): st.write(m["content"])
 
 # [5] 메인 대화 로직
-prompt = st.chat_input(f"Hey {user['name']}! 제니랑 수다 떨 준비 됐어? 🥂")
+prompt = st.chat_input(f"Hey {user['name']}! Ready to chat? 🥂")
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"): st.write(prompt)
 
     try:
-        with st.spinner("Jenny is thinking... 🏄‍♀️"):
+        with st.spinner("Jenny is typing... 🏄‍♀️"):
             response = st.session_state.chat.send_message(prompt)
             answer = response.text
             
             with st.chat_message("assistant"):
                 st.write(answer)
-                
-                # 음성용 텍스트 가공 (한국어 및 슬랭 설명 제거)
                 v_text = re.sub(r'\[Slang:.*?\]', '', answer).strip()
                 v_text = re.sub(r'[ㄱ-ㅎㅏ-ㅣ가-힣]+', '', v_text).strip()
                 
@@ -144,9 +143,9 @@ if prompt:
     except Exception as e:
         st.error(f"Something went wrong: {e}")
 
-# [6] 사이드바: 수업 종료 및 요약 버튼
-if st.sidebar.button("🏁 오늘 수업 끝 (요약하기)"):
+# [6] 사이드바 요약 버튼
+if st.sidebar.button("🏁 오늘 수업 끝!"):
     with st.sidebar:
-        summary_res = st.session_state.chat.send_message("지금까지 대화 내용 중 중요 표현 3가지만 요약해주고 퀴즈 정답 확인해줘!")
-        st.success("Today's Key Expressions")
+        summary_res = st.session_state.chat.send_message("오늘 나눈 대화 요약해주고 퀴즈 정답 확인해줘!")
+        st.success("Today's Summary")
         st.write(summary_res.text)
