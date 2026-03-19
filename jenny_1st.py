@@ -32,10 +32,15 @@ def autoplay_audio(audio_bytes):
 
 st.title("🐆 제니쌤 영어 VIP")
 
-# --- [2] API 설정 (언니의 최신 무적 키) ---
-CLAUDE_API_KEY = "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".strip()
-ELEVENLABS_API_KEY = "sk_6de3761d943fe084486efb94676a26daab9fc28640b57951".strip()
-VOICE_ID = "O7njSdfuJRf0H4s0EQeo"
+# --- [2] API 설정 (보안 강화 버전) ---
+# Secrets에서 키를 가져오도록 수정했습니다.
+try:
+    CLAUDE_API_KEY = st.secrets["CLAUDE_API_KEY"]
+    ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"]
+    VOICE_ID = st.secrets.get("VOICE_ID", "O7njSdfuJRf0H4s0EQeo")
+except:
+    st.warning("API 키가 설정되지 않았습니다. Streamlit Cloud의 Secrets 설정을 확인해주세요!")
+    st.stop()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -44,17 +49,17 @@ for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# --- [3] 입력창 (Win+H로 말해줘!) ---
-prompt = st.chat_input("Hi Jenny! (최신 Sonnet 4.6으로 수다 떨자!)")
+# --- [3] 입력창 ---
+prompt = st.chat_input("Hi Jenny! (제니랑 영어로 대화해요!)")
 
-# --- [4] 대화 로직 (2026년형 모델명 적용) ---
+# --- [4] 대화 로직 (작동하는 모델명으로 수정) ---
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"):
         st.markdown(prompt)
 
     try:
-        with st.spinner("제니가 최신상 뇌로 업그레이드 완료! 🥂"):
+        with st.spinner("제니가 생각 중... 🥂"):
             claude_url = "https://api.anthropic.com/v1/messages"
             claude_headers = {
                 "x-api-key": CLAUDE_API_KEY,
@@ -63,7 +68,7 @@ if prompt:
             }
             
             claude_data = {
-                "model": "claude-sonnet-4-6", # ⭐ 언니가 알려준 2026년 무적의 모델명!
+                "model": "claude-3-5-sonnet-latest", # ⭐ 실제 작동하는 최신 모델명으로 수정!
                 "max_tokens": 1024,
                 "system": """너는 24세 재미교포 제니야. 힙하고 친절한 MZ 선생님이지. 
                 1. 한 줄 영어 대화. (첫 인사만 한국어 가능)
@@ -94,9 +99,7 @@ if prompt:
                 
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             else:
-                # 에러 발생 시 상세 정보 출력 (네트워크 확인 유도)
-                st.error(f"제니의 긴급 진단: {res_json.get('error', {}).get('message', '연결 상태를 확인해줘!')}")
-                st.info("혹시 VPN이나 방화벽이 켜져 있다면 꺼보는 것도 방법이야 언니! 🥊")
+                st.error(f"제니의 긴급 진단: {res_json.get('error', {}).get('message', '연결 상태 확인!')}")
 
     except Exception as e:
         st.error(f"시스템 오류: {e}")
