@@ -33,15 +33,15 @@ def autoplay_audio(audio_bytes):
 
 st.title("🐆 제니쌤 영어 VIP (Gemini)")
 
-# --- [2] API 설정 (Secrets 활용) ---
+# --- [2] API 및 모델 설정 ---
 try:
-    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-    ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
-    VOICE_ID = st.secrets["VOICE_ID"]
+    # Secrets에서 키 가져오기
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"].strip()
+    ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"].strip()
+    VOICE_ID = st.secrets["VOICE_ID"].strip()
 
     genai.configure(api_key=GOOGLE_API_KEY)
 
-    # ⭐ 에러 방지를 위해 모델명을 'gemini-1.5-flash-latest'로 변경
     JENNY_INSTRUCTION = """
     너는 24세 재미교포 제니야. 힙하고 친절한 MZ 선생님이지.
     1. 미국 인스타, 트위터(X)의 최신 신조어와 밈을 사용해.
@@ -50,11 +50,20 @@ try:
     4. 보이스 재생을 위해 한국어는 빼고 오직 영어만 읽어줘.
     """
 
-    # 모델 선언 (경로 에러 방지용 설정)
-    model = genai.GenerativeModel(
-        model_name='gemini-1.5-flash-latest', 
-        system_instruction=JENNY_INSTRUCTION
-    )
+    # ⭐ 모델명을 가장 표준적인 'gemini-1.5-flash'로 설정
+    # 만약 계속 404가 나면 'models/gemini-1.5-flash'로 자동 시도하도록 예외 처리 포함
+    try:
+        model = genai.GenerativeModel(
+            model_name='gemini-1.5-flash',
+            system_instruction=JENNY_INSTRUCTION
+        )
+        # 테스트 호출로 모델 존재 확인
+        model.generate_content("test") 
+    except:
+        model = genai.GenerativeModel(
+            model_name='models/gemini-1.5-flash',
+            system_instruction=JENNY_INSTRUCTION
+        )
 
     if "chat_session" not in st.session_state:
         st.session_state.chat_session = model.start_chat(history=[])
@@ -78,7 +87,6 @@ if prompt:
 
     try:
         with st.spinner("제니가 생각 중... 🥂"):
-            # 제미나이 답변 생성
             response = st.session_state.chat_session.send_message(prompt)
             answer = response.text
             
