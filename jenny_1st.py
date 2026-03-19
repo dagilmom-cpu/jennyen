@@ -5,7 +5,7 @@ import re
 import base64
 from datetime import datetime
 
-# [1] 디자인 및 스타일 설정 (세련된 배경 & 폰트)
+# [1] 디자인 설정
 st.set_page_config(page_title="제니쌤 영어 VIP", page_icon="🏄‍♀️")
 st.markdown("""
     <style>
@@ -25,14 +25,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 🔊 음성 재생 및 다시 듣기 함수
+# 🔊 음성 재생 함수
 def play_eleven_voice(audio_bytes):
     b64 = base64.b64encode(audio_bytes).decode()
     audio_html = f'<audio id="jenny_voice" autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
     st.markdown(audio_html, unsafe_allow_html=True)
     st.audio(audio_bytes, format="audio/mp3")
 
-# [2] 첫 화면: 세련된 입학 신청 폼 (이름/나이/성별/레벨)
+# [2] 첫 화면: 입학 신청서 (이름/나이/성별/레벨)
 if "user_info" not in st.session_state:
     with st.container():
         st.title("🐆 Welcome to Jenny's Surf House!")
@@ -46,7 +46,7 @@ if "user_info" not in st.session_state:
             gender = st.selectbox("Gender", ["Female", "Male", "Non-binary", "Secret"])
             level = st.select_slider("English Level", options=["초급", "중급", "고급"])
         
-        goal = st.text_area("Why English?", placeholder="영어를 공부하려는 목적이 뭐야? (예: 여행, 일, 친구 등)")
+        goal = st.text_area("Why English?", placeholder="영어를 공부하려는 목적이 뭐야? (예: 여행, 일 등)")
         
         if st.button("Start Surfing with Jenny! 🏄‍♀️"):
             if name and goal:
@@ -56,7 +56,7 @@ if "user_info" not in st.session_state:
                 st.warning("이름이랑 목적은 꼭 알려줘야 제니가 맞춤형으로 가르쳐주지! 😉")
     st.stop()
 
-# [3] 제니의 인격 및 지침 설정 (ENFP 서퍼 제니)
+# [3] 제니의 인격 설정 (ENFP 서퍼 제니)
 user = st.session_state.user_info
 today_date = datetime.now().strftime("%Y-%m-%d")
 
@@ -78,20 +78,21 @@ JENNY_PROMPT = f"""
 7. 대화 내용을 기억해서 다음 수업 때 복습할 수 있게 해줘.
 """
 
-# [4] API 연결 (404 & 429 에러 방지 시스템)
+# [4] API 연결 (⭐ 보안 및 에러 방지 강화)
 try:
+    # 🚨 중요: 키는 절대 여기에 적지 말고 Streamlit Secrets 창에만 넣으세요!
     GOOGLE_KEY = st.secrets["GOOGLE_API_KEY"].strip()
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"].strip()
     VOICE_ID = st.secrets["VOICE_ID"].strip()
 
     genai.configure(api_key=GOOGLE_KEY)
     
-    # 서버 목록에서 1.5-flash 모델의 정확한 풀네임을 자동으로 찾아냄
-    if "final_model_path" not in st.session_state:
+    # 모델 이름 자동 탐색 (404 방어)
+    if "final_model" not in st.session_state:
         available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        st.session_state.final_model_path = next((m for m in available_models if "gemini-1.5-flash" in m), available_models[0])
+        st.session_state.final_model = next((m for m in available_models if "gemini-1.5-flash" in m), available_models[0])
 
-    model = genai.GenerativeModel(model_name=st.session_state.final_model_path, system_instruction=JENNY_PROMPT)
+    model = genai.GenerativeModel(model_name=st.session_state.final_model, system_instruction=JENNY_PROMPT)
     
     if "chat" not in st.session_state:
         st.session_state.chat = model.start_chat(history=[])
@@ -105,7 +106,7 @@ for m in st.session_state.messages:
     with st.chat_message(m["role"]): st.write(m["content"])
 
 # [5] 메인 대화 로직
-prompt = st.chat_input(f"Hey {user['name']}! Ready to slay today? 🥂")
+prompt = st.chat_input(f"Hey {user['name']}! Ready to slay? 🥂")
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
@@ -137,9 +138,8 @@ if prompt:
         else:
             st.error(f"Something went wrong: {e}")
 
-# [6] 사이드바 요약 버튼 (그만 말하기 기능 통합)
+# [6] 사이드바 요약 버튼
 if st.sidebar.button("🏁 오늘 수업 끝 (요약하기)"):
-    with st.sidebar:
-        st.success(f"Great job today, {user['name']}! ✨")
-        summary_res = st.session_state.chat.send_message("오늘 나눈 대화 요약해주고 핵심 슬랭 3가지만 정리해줘!")
-        st.write(summary_res.text)
+    summary_res = st.session_state.chat.send_message("오늘 나눈 대화 요약해주고 핵심 슬랭 3가지만 정리해줘!")
+    st.sidebar.success("Today's Summary")
+    st.sidebar.write(summary_res.text)
