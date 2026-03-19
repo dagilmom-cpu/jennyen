@@ -32,7 +32,7 @@ def play_eleven_voice(audio_bytes):
     st.markdown(audio_html, unsafe_allow_html=True)
     st.audio(audio_bytes, format="audio/mp3")
 
-# [2] 첫 화면: 세련된 사용자 정보 입력 폼
+# [2] 첫 화면: 사용자 정보 입력 폼
 if "user_info" not in st.session_state:
     with st.container():
         st.title("🐆 Welcome to Jenny's Surf House!")
@@ -46,7 +46,7 @@ if "user_info" not in st.session_state:
             gender = st.selectbox("Gender", ["Female", "Male", "Non-binary", "Secret"])
             level = st.select_slider("English Level", options=["초급", "중급", "고급"])
         
-        goal = st.text_area("Why English?", placeholder="영어를 공부하려는 목적이 뭐야? (예: 일상 회화, 여행 등)")
+        goal = st.text_area("Why English?", placeholder="영어를 공부하려는 목적이 뭐야? (예: 여행, 일 등)")
         
         if st.button("Start Surfing with Jenny! 🏄‍♀️"):
             if name and goal:
@@ -58,7 +58,7 @@ if "user_info" not in st.session_state:
                 st.warning("이름이랑 목적은 꼭 알려줘야 제니가 맞춤형으로 가르쳐주지! 😉")
     st.stop()
 
-# [3] 제니의 인격 및 지침 설정
+# [3] 제니의 인격 및 지침 설정 (ENFP 제니 인격 유지)
 today_date = datetime.now().strftime("%Y-%m-%d")
 user = st.session_state.user_info
 
@@ -80,23 +80,19 @@ JENNY_PROMPT = f"""
 7. 대화 내용을 기억해서 다음 수업 때 복습할 수 있게 해줘.
 """
 
-# [4] API 연결 (404 에러 방지 시스템 적용)
+# [4] API 연결 (⭐ 1.5-flash로 강제 고정하여 429 에러 방어)
 try:
-    # 🚨 Secrets에 AIzaSyBfrCt_B38fQwATyxWoSmPKO_XuutbME44 를 꼭 업데이트해주세요!
     GOOGLE_KEY = st.secrets["GOOGLE_API_KEY"].strip()
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"].strip()
     VOICE_ID = st.secrets["VOICE_ID"].strip()
 
     genai.configure(api_key=GOOGLE_KEY)
     
-    # 모델 자동 탐색 필살기
-    if "model_path" not in st.session_state:
-        available_models = [m.name for m in genai.list_models() if 'generateContent' in m.supported_generation_methods]
-        target = next((m for m in available_models if "gemini-1.5-flash" in m), available_models[0])
-        st.session_state.model_path = target
+    # 서버가 멋대로 2.5를 쓰지 못하게 1.5-flash로 이름을 못 박음
+    model_name = 'gemini-1.5-flash'
 
     model = genai.GenerativeModel(
-        model_name=st.session_state.model_path, 
+        model_name=model_name, 
         system_instruction=JENNY_PROMPT
     )
     
