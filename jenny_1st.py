@@ -25,10 +25,8 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 🔊 소리 재생 함수 (가장 확실한 HTML5 방식)
 def autoplay_audio(audio_bytes):
     b64 = base64.b64encode(audio_bytes).decode()
-    # playsinline과 controls 없이 숨겨진 오디오 태그로 자동 재생 유도
     md = f"""
         <audio autoplay="true" style="display:none;">
             <source src="data:audio/mp3;base64,{b64}" type="audio/mp3">
@@ -38,14 +36,17 @@ def autoplay_audio(audio_bytes):
 
 st.title("🐆 제니쌤 영어 VIP")
 
-# --- [2] API 설정 (최신 키 반영) ---
+# --- [2] API 설정 (공백 제거 로직 강화) ---
+# Secrets에 있는 키를 가져오되, 앞뒤 공백을 .strip()으로 싹 제거해서 인증 오류를 막습니다.
 try:
-    CLAUDE_API_KEY = st.secrets.get("CLAUDE_API_KEY", "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").strip()
-    ELEVENLABS_API_KEY = st.secrets.get("ELEVENLABS_API_KEY", "sk_6de3761d943fe084486efb94676a26daab9fc28640b57951").strip()
-    VOICE_ID = st.secrets.get("VOICE_ID", "07njSdfuJRf0H4s0EQeo")
+    CLAUDE_API_KEY = st.secrets["CLAUDE_API_KEY"].strip()
+    ELEVENLABS_API_KEY = st.secrets["ELEVENLABS_API_KEY"].strip()
+    VOICE_ID = st.secrets["VOICE_ID"].strip()
 except Exception:
-    st.error("API 키 설정 확인이 필요해 언니! 🔓")
-    st.stop()
+    # 혹시 Secrets 설정 전이라면 코드에 직접 넣은 값을 씁니다.
+    CLAUDE_API_KEY = "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".strip()
+    ELEVENLABS_API_KEY = "sk_6de3761d943fe084486efb94676a26daab9fc28640b57951".strip()
+    VOICE_ID = "O7njSdfuJRf0H4s0EQeo".strip()
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -55,7 +56,7 @@ for msg in st.session_state.messages:
         st.markdown(msg["content"])
 
 # --- [3] 입력창 ---
-prompt = st.chat_input("Hi Jenny! (제니랑 영어로 수다 떨자!)")
+prompt = st.chat_input("Hi Jenny! (제니랑 영어로 대화해요!)")
 
 # --- [4] 대화 로직 (모델명: claude-sonnet-4-6 유지) ---
 if prompt:
@@ -91,7 +92,7 @@ if prompt:
                 with st.chat_message("assistant"):
                     st.markdown(answer)
                     
-                    # 💡 한국어/슬랭 설명 제외하고 영어만 추출
+                    # 영어만 추출 (목소리용)
                     voice_text = re.sub(r'\[Slang:.*?\]', '', answer).strip()
                     voice_text = re.sub(r'[ㄱ-ㅎㅏ-ㅣ가-힣]+', '', voice_text).strip()
                     
@@ -100,15 +101,15 @@ if prompt:
                         el_headers = {
                             "Accept": "audio/mpeg", 
                             "Content-Type": "application/json", 
-                            "xi-api-key": ELEVENLABS_API_KEY
+                            "xi-api-key": ELEVENLABS_API_KEY # ⭐ 공백 제거된 깨끗한 키 사용
                         }
                         v_res = requests.post(el_url, headers=el_headers, json={"text": voice_text, "model_id": "eleven_multilingual_v2"})
                         
                         if v_res.status_code == 200:
-                            # 🔊 수정된 자동 재생 함수 호출
                             autoplay_audio(v_res.content)
                         else:
-                            st.warning(f"목소리 엔진 오류: {v_res.status_code}")
+                            # 만약 또 에러가 나면 구체적으로 뭐가 문제인지 화면에 띄웁니다.
+                            st.warning(f"목소리 엔진 알림: {v_res.text}")
                 
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             else:
