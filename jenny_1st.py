@@ -4,7 +4,7 @@ import requests
 import re
 import base64
 
-# --- [1] 럭셔리 호피 디자인 (제니쌤 시그니처) ---
+# --- [1] 디자인 설정 ---
 st.set_page_config(page_title="제니쌤 영어 VIP", page_icon="🐆")
 st.markdown("""
     <style>
@@ -26,7 +26,6 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# 🔊 사운드 자동 재생 함수
 def autoplay_audio(audio_bytes):
     b64 = base64.b64encode(audio_bytes).decode()
     audio_html = f'<audio autoplay="true" style="display:none;"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
@@ -34,47 +33,51 @@ def autoplay_audio(audio_bytes):
 
 st.title("🐆 제니쌤 영어 VIP (Gemini)")
 
-# --- [2] API 및 학습 지침 설정 ---
-GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
-ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
-VOICE_ID = st.secrets["VOICE_ID"]
+# --- [2] API 설정 (Secrets 활용) ---
+try:
+    GOOGLE_API_KEY = st.secrets["GOOGLE_API_KEY"]
+    ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"]
+    VOICE_ID = st.secrets["VOICE_ID"]
 
-genai.configure(api_key=GOOGLE_API_KEY)
+    genai.configure(api_key=GOOGLE_API_KEY)
 
-# ⭐ 제니의 뇌에 "최신 트렌드"와 "슬랭" 지침을 박제!
-JENNY_INSTRUCTION = """
-너는 24세 재미교포 제니야. 힙하고 친절한 MZ 선생님이지.
-1. 지금 미국 인스타, 트위터(X)에서 가장 핫한 신조어와 밈(Meme)을 적극적으로 사용해줘.
-2. 대화 중간중간 최신 팝컬처나 뉴스 이야기를 섞어서 진짜 현지인처럼 말해.
-3. 무조건 영어 한 줄 대화! (첫 인사만 한국어 가능)
-4. 슬랭이나 약어 사용 시 끝에 [Slang: 단어-뜻] 붙이기.
-5. 보이스 재생을 위해 한국어는 빼고 오직 영어만 읽어줘.
-"""
+    # ⭐ 에러 방지를 위해 모델명을 'gemini-1.5-flash-latest'로 변경
+    JENNY_INSTRUCTION = """
+    너는 24세 재미교포 제니야. 힙하고 친절한 MZ 선생님이지.
+    1. 미국 인스타, 트위터(X)의 최신 신조어와 밈을 사용해.
+    2. 무조건 영어 한 줄 대화! (첫 인사만 한국어 가능)
+    3. 슬랭 사용 시 끝에 [Slang: 단어-뜻] 붙이기.
+    4. 보이스 재생을 위해 한국어는 빼고 오직 영어만 읽어줘.
+    """
 
-model = genai.GenerativeModel(
-    model_name='gemini-1.5-flash',
-    system_instruction=JENNY_INSTRUCTION
-)
+    # 모델 선언 (경로 에러 방지용 설정)
+    model = genai.GenerativeModel(
+        model_name='gemini-1.5-flash-latest', 
+        system_instruction=JENNY_INSTRUCTION
+    )
 
-# 세션 관리 (대화 기억)
-if "chat_session" not in st.session_state:
-    st.session_state.chat_session = model.start_chat(history=[])
-if "messages" not in st.session_state:
-    st.session_state.messages = []
+    if "chat_session" not in st.session_state:
+        st.session_state.chat_session = model.start_chat(history=[])
+    if "messages" not in st.session_state:
+        st.session_state.messages = []
+
+except Exception as e:
+    st.error(f"설정 에러: Secrets를 확인해줘 언니! ({e})")
+    st.stop()
 
 # 대화 로그 출력
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]): st.markdown(msg["content"])
 
 # --- [3] 메인 대화 로직 ---
-prompt = st.chat_input("Hi Jenny! 오늘 미국에서 뭐가 핫해? 🔥")
+prompt = st.chat_input("Hi Jenny! 오늘 분위기 어때? 🔥")
 
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
     with st.chat_message("user"): st.markdown(prompt)
 
     try:
-        with st.spinner("제니가 인스타 확인 중... 🥂"):
+        with st.spinner("제니가 생각 중... 🥂"):
             # 제미나이 답변 생성
             response = st.session_state.chat_session.send_message(prompt)
             answer = response.text
@@ -82,7 +85,7 @@ if prompt:
             with st.chat_message("assistant"):
                 st.markdown(answer)
                 
-                # ElevenLabs 음성 생성 (영어만)
+                # ElevenLabs 음성 생성
                 v_text = re.sub(r'\[Slang:.*?\]', '', answer).strip()
                 v_text = re.sub(r'[ㄱ-ㅎㅏ-ㅣ가-힣]+', '', v_text).strip()
                 
