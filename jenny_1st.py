@@ -23,7 +23,7 @@ def play_eleven_voice(audio_bytes):
 # [2] 첫 화면: 사용자 정보 입력 (세련된 폼)
 if "user_info" not in st.session_state:
     with st.container():
-        st.title("🐆 Welcome to Jenny's Surf House!")
+        st.title("🐆 Welcome!")
         st.subheader("제니쌤과 파티하기 전에 통성명부터 할까? ✨")
         
         col1, col2 = st.columns(2)
