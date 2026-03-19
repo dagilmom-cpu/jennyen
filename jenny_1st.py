@@ -32,9 +32,10 @@ def autoplay_audio(audio_bytes):
 
 st.title("🐆 제니쌤 영어 VIP")
 
-# --- [2] API 설정 (언니의 최신 무적 키) ---
-CLAUDE_API_KEY = "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".strip()
-ELEVENLABS_API_KEY = "sk_6de3761d943fe084486efb94676a26daab9fc28640b57951".strip()
+# --- [2] API 설정 (언니의 최신 무적 키 직접 적용) ---
+# 방금 알려주신 따끈따끈한 새 키들입니다!
+CLAUDE_API_KEY = "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".strip()
+ELEVENLABS_API_KEY = "sk_9665d7f430925bb8ef413175c17b94f9c74ea27f2d88b5f5".strip()
 VOICE_ID = "O7njSdfuJRf0H4s0EQeo"
 
 if "messages" not in st.session_state:
@@ -87,14 +88,18 @@ if prompt:
                     
                     if voice_text:
                         el_url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
-                        el_headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVENLABS_API_KEY}
+                        el_headers = {
+                            "Accept": "audio/mpeg", 
+                            "Content-Type": "application/json", 
+                            "xi-api-key": ELEVENLABS_API_KEY
+                        }
                         v_res = requests.post(el_url, headers=el_headers, json={"text": voice_text, "model_id": "eleven_multilingual_v2"})
                         if v_res.status_code == 200:
                             autoplay_audio(v_res.content)
                 
                 st.session_state.messages.append({"role": "assistant", "content": answer})
             else:
-                # 에러 발생 시 상세 정보 출력 (네트워크 확인 유도)
+                # 에러 발생 시 상세 정보 출력
                 st.error(f"제니의 긴급 진단: {res_json.get('error', {}).get('message', '연결 상태를 확인해줘!')}")
                 st.info("혹시 VPN이나 방화벽이 켜져 있다면 꺼보는 것도 방법이야 언니! 🥊")
 
