@@ -3,189 +3,100 @@ import requests
 import re
 import base64
 
-# ---------------------------
-# [1] 기본 설정 & 스타일
-# ---------------------------
+# --- [1] 럭셔리 호피 디자인 설정 ---
 st.set_page_config(page_title="제니쌤 영어 VIP", page_icon="🐆")
-
 st.markdown("""
-<style>
-.stApp {
-    background-image: url("https://img.freepik.com/premium-photo/luxury-pink-gold-leopard-print-pattern-background_911061-163.jpg");
-    background-size: cover;
-    background-attachment: fixed;
-}
-html, body, [class*="css"], .stMarkdown, p, span, div {
-    color: #000000 !important;
-    font-weight: 900 !important;
-    text-shadow: -2px -2px 0 #FFF, 2px -2px 0 #FFF, -2px 2px 0 #FFF, -2px 2px 0 #FFF !important;
-}
-.stChatMessage[data-testid="stChatMessageAssistant"] {
-    background-color: rgba(0, 0, 0, 0.95) !important;
-    border: 2px solid #FFD700 !important;
-    border-radius: 15px;
-}
-.stChatMessage[data-testid="stChatMessageAssistant"] p {
-    color: #FFFFFF !important;
-    text-shadow: none !important;
-}
-</style>
-""", unsafe_allow_html=True)
+    <style>
+    .stApp { 
+        background-image: url("https://img.freepik.com/premium-photo/luxury-pink-gold-leopard-print-pattern-background_911061-163.jpg"); 
+        background-size: cover; background-position: center; background-attachment: fixed; 
+    }
+    html, body, [class*="css"], .stMarkdown, p, span, div { 
+        color: #000000 !important; font-weight: 900 !important; 
+        text-shadow: -2px -2px 0 #FFF, 2px -2px 0 #FFF, -2px 2px 0 #FFF, -2px 2px 0 #FFF !important; 
+    }
+    .stChatMessage[data-testid="stChatMessageAssistant"] { 
+        background-color: rgba(0, 0, 0, 0.95) !important; 
+        border: 2px solid #FFD700 !important; border-radius: 15px; 
+    }
+    .stChatMessage[data-testid="stChatMessageAssistant"] p { 
+        color: #FFFFFF !important; text-shadow: none !important; 
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+def autoplay_audio(audio_bytes):
+    b64 = base64.b64encode(audio_bytes).decode()
+    md = f'<audio autoplay="true"><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>'
+    st.markdown(md, unsafe_allow_html=True)
 
 st.title("🐆 제니쌤 영어 VIP")
 
-# ---------------------------
-# [2] API 키 안전 로딩
-# ---------------------------
-def get_clean_key(name):
-    val = st.secrets.get(name, "")
-    return str(val).strip().replace("\n", "").replace("\r", "")
+# --- [2] API 설정 (언니의 최신 무적 키) ---
+CLAUDE_API_KEY = "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".strip()
+ELEVENLABS_API_KEY = "sk_6de3761d943fe084486efb94676a26daab9fc28640b57951".strip()
+VOICE_ID = "O7njSdfuJRf0H4s0EQeo"
 
-CLAUDE_API_KEY = get_clean_key("CLAUDE_API_KEY")
-ELEVENLABS_API_KEY = get_clean_key("ELEVENLABS_API_KEY")
-VOICE_ID = get_clean_key("VOICE_ID")
-
-if not CLAUDE_API_KEY or not ELEVENLABS_API_KEY:
-    st.warning("Secrets에 API 키 넣어줘 🔐")
-    st.stop()
-
-# ---------------------------
-# [3] 세션 상태
-# ---------------------------
 if "messages" not in st.session_state:
     st.session_state.messages = []
 
-if "last_audio" not in st.session_state:
-    st.session_state.last_audio = None
-
-# ---------------------------
-# [4] Claude 메시지 포맷 변환
-# ---------------------------
-def format_messages(messages):
-    formatted = []
-    for m in messages:
-        formatted.append({
-            "role": m["role"],
-            "content": [{"type": "text", "text": m["content"]}]
-        })
-    return formatted
-
-# ---------------------------
-# [5] UI 옵션
-# ---------------------------
-level = st.selectbox("🎯 영어 레벨", ["초급", "중급", "원어민"])
-
-level_map = {
-    "초급": "아주 쉬운 영어",
-    "중급": "일상 회화 영어",
-    "원어민": "슬랭 포함 자연스러운 영어"
-}
-
-# ---------------------------
-# [6] 기존 메시지 출력
-# ---------------------------
 for msg in st.session_state.messages:
     with st.chat_message(msg["role"]):
         st.markdown(msg["content"])
 
-# ---------------------------
-# [7] 입력창
-# ---------------------------
-prompt = st.chat_input("Hi Jenny! (말 걸어봐 💬)")
+# --- [3] 입력창 (Win+H로 말해줘!) ---
+prompt = st.chat_input("Hi Jenny! (최신 Sonnet 4.6으로 수다 떨자!)")
 
-# ---------------------------
-# [8] 메인 로직
-# ---------------------------
+# --- [4] 대화 로직 (2026년형 모델명 적용) ---
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt})
-
     with st.chat_message("user"):
         st.markdown(prompt)
 
     try:
-        with st.spinner("제니 생각중... 💭"):
-            # Claude 요청
-            c_headers = {
+        with st.spinner("제니가 최신상 뇌로 업그레이드 완료! 🥂"):
+            claude_url = "https://api.anthropic.com/v1/messages"
+            claude_headers = {
                 "x-api-key": CLAUDE_API_KEY,
                 "anthropic-version": "2023-06-01",
                 "content-type": "application/json"
             }
-
-            system_prompt = f"""
-너는 24세 재미교포 제니야.
-MZ 영어 선생님이고 힙하게 말해.
-{level_map[level]} 수준으로 한 줄 영어만 말해.
-슬랭 사용 시 [Slang: 단어-뜻] 붙여.
-대화 시 이름, 나이, 직업 등을 물어보고 기억하며 친근하게 대해줘.
-"""
-
-            c_data = {
-                "model": "claude-sonnet-4-6", # ⭐ 언니가 알려준 2026년 무적 모델명 적용!
-                "max_tokens": 300,
-                "system": system_prompt,
-                "messages": format_messages(st.session_state.messages)
+            
+            claude_data = {
+                "model": "claude-sonnet-4-6", # ⭐ 언니가 알려준 2026년 무적의 모델명!
+                "max_tokens": 1024,
+                "system": """너는 24세 재미교포 제니야. 힙하고 친절한 MZ 선생님이지. 
+                1. 한 줄 영어 대화. (첫 인사만 한국어 가능)
+                2. 이름, 나이, 직업을 물어보고 기억해줘.
+                3. 슬랭 사용 시 끝에 [Slang: 단어-뜻] 붙이기.
+                4. 보이스 재생 시 한국어는 빼고 오직 영어만 읽어줘.""",
+                "messages": st.session_state.messages
             }
+            
+            response = requests.post(claude_url, headers=claude_headers, json=claude_data, timeout=15)
+            res_json = response.json()
 
-            res_raw = requests.post(
-                "https://api.anthropic.com/v1/messages",
-                headers=c_headers,
-                json=c_data,
-                timeout=40
-            )
-            res = res_raw.json()
-
-            if "content" not in res:
-                st.error(f"Claude 오류: {res.get('error', {}).get('message', '연결 확인!')}")
-                st.stop()
-
-            answer = res["content"][0]["text"]
-
-        # ---------------------------
-        # [9] 텍스트 먼저 출력
-        # ---------------------------
-        with st.chat_message("assistant"):
-            st.markdown(answer)
-
-        st.session_state.messages.append({"role": "assistant", "content": answer})
-
-        # ---------------------------
-        # [10] 음성 생성
-        # ---------------------------
-        # 한국어와 슬랭 설명은 빼고 영어만 골라내기
-        v_text = re.sub(r'\[Slang:.*?\]', '', answer).strip()
-        v_text = re.sub(r'[ㄱ-ㅎㅏ-ㅣ가-힣]+', '', v_text).strip()
-
-        if v_text:
-            with st.spinner("🎤 제니가 말하는 중..."):
-                el_url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
-                el_headers = {
-                    "Accept": "audio/mpeg",
-                    "Content-Type": "application/json",
-                    "xi-api-key": ELEVENLABS_API_KEY
-                }
-
-                el_data = {
-                    "text": v_text,
-                    "model_id": "eleven_multilingual_v2",
-                    "voice_settings": {"stability": 0.4, "similarity_boost": 0.8}
-                }
-
-                v_res = requests.post(el_url, headers=el_headers, json=el_data, timeout=40)
-
-                if v_res.status_code == 200:
-                    st.session_state.last_audio = v_res.content
-                    # 🔊 자동 재생
-                    st.audio(v_res.content, format="audio/mp3", autoplay=True)
-                else:
-                    st.warning(f"음성 인증 오류: {v_res.text}")
+            if "content" in res_json:
+                answer = res_json["content"][0]["text"]
+                with st.chat_message("assistant"):
+                    st.markdown(answer)
+                    
+                    # 보이스 전용 텍스트 필터링 (영어만)
+                    voice_text = re.sub(r'\[Slang:.*?\]', '', answer).strip()
+                    voice_text = re.sub(r'[ㄱ-ㅎㅏ-ㅣ가-힣]+', '', voice_text).strip()
+                    
+                    if voice_text:
+                        el_url = f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}"
+                        el_headers = {"Accept": "audio/mpeg", "Content-Type": "application/json", "xi-api-key": ELEVENLABS_API_KEY}
+                        v_res = requests.post(el_url, headers=el_headers, json={"text": voice_text, "model_id": "eleven_multilingual_v2"})
+                        if v_res.status_code == 200:
+                            autoplay_audio(v_res.content)
+                
+                st.session_state.messages.append({"role": "assistant", "content": answer})
+            else:
+                # 에러 발생 시 상세 정보 출력 (네트워크 확인 유도)
+                st.error(f"제니의 긴급 진단: {res_json.get('error', {}).get('message', '연결 상태를 확인해줘!')}")
+                st.info("혹시 VPN이나 방화벽이 켜져 있다면 꺼보는 것도 방법이야 언니! 🥊")
 
     except Exception as e:
         st.error(f"시스템 오류: {e}")
-
-# ---------------------------
-# [11] 다시 듣기 버튼 (하단 고정 느낌)
-# ---------------------------
-if st.session_state.last_audio:
-    st.divider()
-    if st.button("🔊 Last Sentence (다시 듣기)"):
-        st.audio(st.session_state.last_audio, format="audio/mp3", autoplay=True)
