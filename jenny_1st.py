@@ -14,9 +14,10 @@ st.markdown("""
         background-size: cover; background-position: center; background-attachment: fixed; 
     }
     .stChatMessage { background-color: rgba(255, 255, 255, 0.85) !important; border-radius: 15px; border: 2px solid #FFD700; }
-    .korean { color: #FF1493 !important; font-weight: bold !important; } /* 한글 핑크색 */
+    .korean { color: #FF1493 !important; font-weight: bold !important; } 
     p, span, div { color: #000 !important; font-weight: 800 !important; }
-    audio { display: none; } 
+    /* 자동 재생용 숨겨진 오디오 */
+    .hidden-audio { display: none; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -33,7 +34,7 @@ except Exception as e:
 if "messages" not in st.session_state: st.session_state.messages = []
 if "learned_exps" not in st.session_state: st.session_state.learned_exps = []
 
-# [4] 입학 신청서 (글로벌 버전 옵션)
+# [4] 입학 신청서
 if "user_info" not in st.session_state:
     st.title("🐆 Welcome to Jenny's VIP English Lounge")
     st.subheader("Ready to elevate your English with a pro surfer vibe? 🥂")
@@ -61,20 +62,21 @@ with st.sidebar:
     st.subheader("📚 Key Expressions")
     for e in st.session_state.learned_exps: st.write(f"✨ {e}")
 
-# 제니의 세련된 지침 (호칭 변경 반영)
 JENNY_SYSTEM = f"""너는 24세 재미교포 제니야. 전문 영어 강사이고 ENFP 서퍼지.
 사용자 이름: {user['name']}, 레벨: {user['level']}, 목적: {user['goal']}
 [글로벌 지침]
-1. 사용자를 '언니'라고 부르지 마. 대신 이름을 부르거나 'Bestie', 'My friend', 'Dear' 등을 사용해.
+1. 사용자를 '언니'라고 부르지 마. 이름이나 'Bestie', 'My friend' 등을 사용해.
 2. 첫 인사만 한국어, 이후 100% 영어 대화.
 3. 슬랭은 **굵게**, 끝에 [Slang: 단어 - <span class='korean'>한글뜻</span>] 추가.
-4. 표현은 [[표현: 영어 - <span class='korean'>한글뜻</span>]] 형식으로 문장 끝에 포함.
-5. 한글 뜻은 반드시 <span class='korean'> </span> 태그로 감싸줘."""
+4. 표현은 [[표현: 영어 - <span class='korean'>한글뜻</span>]] 형식. 한글은 반드시 <span class='korean'> </span> 태그로 감싸줘."""
 
 # 로그 출력
 for m in st.session_state.messages:
     if m["role"] != "system":
-        with st.chat_message(m["role"]): st.markdown(m["display_content"], unsafe_allow_html=True)
+        with st.chat_message(m["role"]):
+            st.markdown(m["display_content"], unsafe_allow_html=True)
+            if m.get("audio_b64"): # 과거 대화에서도 다시 듣기 바 노출
+                st.audio(base64.b64decode(m["audio_b64"]), format="audio/mp3")
 
 # [6] 대화 로직
 prompt = st.chat_input(f"Hi {user['name']}! Let's catch some waves! 🥂")
@@ -91,7 +93,6 @@ if prompt:
             )
             ans = res.choices[0].message.content
             
-            # 표현 추출
             exps = re.findall(r'\[\[표현: (.*?)\]\]', ans)
             for e in exps:
                 clean_e = re.sub(r'<.*?>', '', e)
@@ -102,6 +103,7 @@ if prompt:
                 st.markdown(display_ans, unsafe_allow_html=True)
                 
                 v_text = re.sub(r'<.*?>|\[.*?\]|[ㄱ-ㅎㅏ-ㅣ가-힣]+', '', ans).strip()
+                audio_b64 = None
                 if v_text:
                     v_res = requests.post(
                         f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}",
@@ -109,13 +111,19 @@ if prompt:
                         json={"text": v_text, "model_id": "eleven_multilingual_v2", "voice_settings": {"stability": 0.5, "similarity_boost": 0.8}}
                     )
                     if v_res.status_code == 200:
-                        b64 = base64.b64encode(v_res.content).decode()
+                        audio_data = v_res.content
+                        audio_b64 = base64.b64encode(audio_data).decode()
+                        
+                        # 1. 시각적인 '다시 듣기' 플레이어 (st.audio 사용)
+                        st.audio(audio_data, format="audio/mp3")
+                        
+                        # 2. 자동 재생용 자바스크립트 (숨겨진 오디오)
                         md = f"""
-                            <audio id="ja" autoplay><source src="data:audio/mp3;base64,{b64}" type="audio/mp3"></audio>
+                            <audio id="ja" class="hidden-audio" autoplay><source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3"></audio>
                             <script>var a=document.getElementById('ja'); a.playbackRate={v_speed}; a.play();</script>
                             """
                         st.markdown(md, unsafe_allow_html=True)
             
-            st.session_state.messages.append({"role": "assistant", "content": ans, "display_content": display_ans})
+            st.session_state.messages.append({"role": "assistant", "content": ans, "display_content": display_ans, "audio_b64": audio_b64})
     except Exception as e:
         st.error(f"🚨 Error: {e}")
