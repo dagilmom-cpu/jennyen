@@ -51,7 +51,7 @@ if "user_info" not in st.session_state:
 
 user = st.session_state.user_info
 
-# [5] 사이드바 & 요약 (요약 로직 대폭 강화)
+# [5] 사이드바 및 요약 로직 (수정됨)
 with st.sidebar:
     st.title(f"🐆 {user['name']}'s Studio")
     v_speed = st.slider("🗣️ Voice Speed", 0.5, 2.0, 1.4, 0.1)
@@ -63,25 +63,35 @@ with st.sidebar:
     for e in list(dict.fromkeys(st.session_state.learned_exps)):
         st.write(f"✨ {e}")
 
+# ⭐ [요약 화면 전용 섹션]
 if st.session_state.summary_mode:
     st.balloons()
-    st.title("🎓 Today's Recap")
-    # 요약용 전용 지침: 태그와 슬랭 형식을 모두 제거하라고 명시
-    sum_res = client.chat.completions.create(
-        messages=[{"role": "system", "content": "너는 깔끔한 요약 전문가야. 오늘 대화 내용을 3줄의 아주 쉬운 한국어 평서문으로 요약하고, 핵심 표현 3개를 '단어 - 뜻' 형식으로 정리해. **절대 슬랭 태그([Slang:])나 HTML 태그(<span...>)를 쓰지 마. 한자/일어도 금지.**"}] + 
-                 [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
-        model="llama-3.3-70b-versatile",
-    )
-    # 2차 방어: 코드로 한 번 더 태그 찌꺼기 제거
-    summary_text = sum_res.choices[0].message.content
-    clean_summary = re.sub(r'\[Slang:.*?\]|\[\[표현:.*?\]\]|<.*?>|[一-龥ぁ-ゔァ-ヶー]', '', summary_text)
+    st.header("🎓 Today's Recap")
     
-    st.success(f"Great work today, {user['name']}!")
-    st.info(clean_summary)
-    if st.button("대화로 돌아가기"):
+    if not st.session_state.messages:
+        st.warning("아직 대화 내용이 없어서 요약할 게 없어, 언니! 😅")
+    else:
+        with st.spinner("Jenny is writing your study note... ✍️"):
+            try:
+                # 요약 요청 (지침 강화)
+                sum_res = client.chat.completions.create(
+                    messages=[{"role": "system", "content": "너는 깔끔한 영어 튜터 제니야. 오늘 대화 내용을 3줄의 한국어 평서문으로 요약하고 핵심 표현 3개를 '단어 - 뜻' 형식으로 정리해줘. 한자/일어/특수태그 절대 금지."}] + 
+                             [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
+                    model="llama-3.3-70b-versatile",
+                )
+                raw_summary = sum_res.choices[0].message.content
+                # 찌꺼기 제거 필터
+                clean_summary = re.sub(r'\[Slang:.*?\]|\[\[표현:.*?\]\]|<.*?>|[一-龥ぁ-ゔァ-ヶー]', '', raw_summary)
+                
+                st.success(f"You did a great job today, {user['name']}! 🥂")
+                st.markdown(f"### 📝 Summary & Key Points\n{clean_summary}")
+            except Exception as e:
+                st.error(f"요약 중 에러 발생: {e}")
+
+    if st.button("대화로 다시 돌아가기"):
         st.session_state.summary_mode = False
         st.rerun()
-    st.stop()
+    st.stop() # 요약 모드일 때는 대화창이 안 보이게 멈춤
 
 # [6] 시스템 지침
 JENNY_SYSTEM = f"""너는 24세 재미교포 제니야. 레벨: {user['level']}.
@@ -97,7 +107,7 @@ for m in st.session_state.messages:
             if m.get("audio_b64"): st.audio(base64.b64decode(m["audio_b64"]), format="audio/mp3")
 
 # [7] 대화 로직
-prompt = st.chat_input(f"Hi {user['name']}!")
+prompt = st.chat_input(f"Hi {user['name']}! Say something!")
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt, "display_content": prompt})
     with st.chat_message("user"): st.write(prompt)
@@ -112,6 +122,7 @@ if prompt:
             raw_ans = res.choices[0].message.content
             ans = re.sub(r'[一-龥ぁ-ゔァ-ヶー]', '', raw_ans)
             
+            # 표현 추출
             exps = re.findall(r'\[\[표현:\s*(.*?)\s*\]\]', ans)
             for e in exps:
                 clean_e = re.sub(r'<.*?>|영어\s*[:|-]\s*', '', e).strip()
