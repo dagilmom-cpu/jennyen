@@ -5,7 +5,7 @@ import re
 import base64
 from datetime import datetime
 
-# [1] 디자인 (럭셔리 배경 & 세련된 텍스트 스타일)
+# [1] 디자인 (럭셔리 배경 & 세련된 스타일)
 st.set_page_config(page_title="Jenny's English VIP", page_icon="🐆", layout="wide")
 st.markdown("""
     <style>
@@ -16,7 +16,6 @@ st.markdown("""
     .stChatMessage { background-color: rgba(255, 255, 255, 0.85) !important; border-radius: 15px; border: 2px solid #FFD700; }
     .korean { color: #FF1493 !important; font-weight: bold !important; } 
     p, span, div { color: #000 !important; font-weight: 800 !important; }
-    /* 자동 재생용 숨겨진 오디오 */
     .hidden-audio { display: none; }
     </style>
     """, unsafe_allow_html=True)
@@ -37,16 +36,16 @@ if "learned_exps" not in st.session_state: st.session_state.learned_exps = []
 # [4] 입학 신청서
 if "user_info" not in st.session_state:
     st.title("🐆 Welcome to Jenny's VIP English Lounge")
-    st.subheader("Ready to elevate your English with a pro surfer vibe? 🥂")
+    st.subheader("Ready to catch a wave with native-speed English? 🌊")
     c1, c2 = st.columns(2)
     with c1:
-        name = st.text_input("What should I call you?", value="maykim")
+        name = st.text_input("Name", value="maykim")
         age = st.number_input("Age", min_value=0, max_value=100, value=25)
     with c2:
         gender = st.selectbox("Gender", ["Female", "Male", "Non-binary", "Prefer not to say"])
         level = st.select_slider("English Level", options=["Beginner", "Intermediate", "Advanced"])
-    goal = st.text_area("Your Goal", placeholder="Tell me why you want to master English!")
-    if st.button("Start Your Journey! 🏄‍♀️"):
+    goal = st.text_area("Your Goal", placeholder="What's your ultimate goal?")
+    if st.button("Start Your Native Journey! 🏄‍♀️"):
         if name and goal:
             st.session_state.user_info = {"name": name, "age": age, "gender": gender, "level": level, "goal": goal}
             st.rerun()
@@ -54,10 +53,11 @@ if "user_info" not in st.session_state:
 
 user = st.session_state.user_info
 
-# [5] 사이드바
+# [5] 사이드바 (말속도 기본값 상향)
 with st.sidebar:
     st.title(f"🐆 {user['name']}'s Studio")
-    v_speed = st.slider("🗣️ Voice Speed", 0.5, 2.0, 1.2, 0.1)
+    # 기본 속도를 1.4로 상향해서 더 원어민스럽게!
+    v_speed = st.slider("🗣️ Voice Speed", 0.5, 2.0, 1.4, 0.1)
     st.divider()
     st.subheader("📚 Key Expressions")
     for e in st.session_state.learned_exps: st.write(f"✨ {e}")
@@ -75,17 +75,17 @@ for m in st.session_state.messages:
     if m["role"] != "system":
         with st.chat_message(m["role"]):
             st.markdown(m["display_content"], unsafe_allow_html=True)
-            if m.get("audio_b64"): # 과거 대화에서도 다시 듣기 바 노출
+            if m.get("audio_b64"):
                 st.audio(base64.b64decode(m["audio_b64"]), format="audio/mp3")
 
 # [6] 대화 로직
-prompt = st.chat_input(f"Hi {user['name']}! Let's catch some waves! 🥂")
+prompt = st.chat_input(f"Hey {user['name']}! Let's talk like a pro! 🥂")
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt, "display_content": prompt})
     with st.chat_message("user"): st.write(prompt)
 
     try:
-        with st.spinner("Jenny is typing... 🌊"):
+        with st.spinner("Jenny is catching a wave... 🌊"):
             res = client.chat.completions.create(
                 messages=[{"role": "system", "content": JENNY_SYSTEM}] + 
                          [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
@@ -108,16 +108,18 @@ if prompt:
                     v_res = requests.post(
                         f"https://api.elevenlabs.io/v1/text-to-speech/{VOICE_ID}",
                         headers={"xi-api-key": ELEVEN_KEY},
-                        json={"text": v_text, "model_id": "eleven_multilingual_v2", "voice_settings": {"stability": 0.5, "similarity_boost": 0.8}}
+                        json={
+                            "text": v_text, 
+                            "model_id": "eleven_multilingual_v2", 
+                            "voice_settings": {"stability": 0.45, "similarity_boost": 0.8} # 경쾌함 극대화
+                        }
                     )
                     if v_res.status_code == 200:
                         audio_data = v_res.content
                         audio_b64 = base64.b64encode(audio_data).decode()
                         
-                        # 1. 시각적인 '다시 듣기' 플레이어 (st.audio 사용)
                         st.audio(audio_data, format="audio/mp3")
                         
-                        # 2. 자동 재생용 자바스크립트 (숨겨진 오디오)
                         md = f"""
                             <audio id="ja" class="hidden-audio" autoplay><source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3"></audio>
                             <script>var a=document.getElementById('ja'); a.playbackRate={v_speed}; a.play();</script>
