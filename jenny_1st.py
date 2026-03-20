@@ -4,7 +4,7 @@ import requests
 import re
 import base64
 
-# [1] 디자인 (럭셔리 스타일)
+# [1] 디자인
 st.set_page_config(page_title="Jenny's VIP Global Academy", page_icon="🐆", layout="wide")
 st.markdown("""
     <style>
@@ -19,15 +19,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# [2] API 연결 (Secrets 이름 'VOICE_ID'로 수정 완료!)
+# [2] API 연결 (VOICE_ID 이름 유지)
 try:
     GROQ_KEY = st.secrets["GROQ_API_KEY"].strip()
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"].strip()
-    VOICE_ID = st.secrets["VOICE_ID"].strip() # <-- 언니 요청대로 VOICE_ID로 수정!
+    VOICE_ID = st.secrets["VOICE_ID"].strip()
     client = Groq(api_key=GROQ_KEY)
 except Exception as e:
-    st.error(f"🚨 Secrets 설정 확인 필요: {e}")
-    st.stop()
+    st.error(f"🚨 Secrets 설정 확인 필요: {e}"); st.stop()
 
 # [3] 세션 초기화
 if "messages" not in st.session_state: st.session_state.messages = []
@@ -42,9 +41,9 @@ if "user_info" not in st.session_state:
         name = st.text_input("Name", value="maykim")
         role = st.selectbox("Your Goal", ["소상공인 영어 배우기", "미드로 영어 표현 배우기", "비지니스 영어 배우기", "유창한 영어 배우기", "토론 해보기", "영어 인터뷰 배우기"])
     with c2:
-        level = st.select_slider("English Level", options=["Beginner", "Intermediate", "Advanced"])
-        interest = st.text_area("Your Interests", placeholder="e.g. SATC, News, K-pop...")
-    if st.button("Unlock Your Potential! 🏄‍♀️"):
+        level = st.select_slider("Level", options=["Beginner", "Intermediate", "Advanced"])
+        interest = st.text_area("Interests", placeholder="e.g. SATC, News, K-pop...")
+    if st.button("Start! 🏄‍♀️"):
         if name and interest:
             st.session_state.user_info = {"name": name, "role": role, "level": level, "interest": interest}
             st.rerun()
@@ -52,7 +51,7 @@ if "user_info" not in st.session_state:
 
 user = st.session_state.user_info
 
-# [5] 사이드바 및 요약
+# [5] 사이드바 (오늘 배운 표현 리스트 추출 보강)
 with st.sidebar:
     st.title(f"🐆 {user['name']}'s Studio")
     v_speed = st.slider("🗣️ Voice Speed", 0.5, 2.0, 1.4, 0.1)
@@ -67,22 +66,22 @@ with st.sidebar:
 if st.session_state.summary_mode:
     st.balloons()
     sum_res = client.chat.completions.create(
-        messages=[{"role": "system", "content": "3줄 요약 + 핵심표현 3개. 한자/일어 절대 금지."}] + 
+        messages=[{"role": "system", "content": "3줄 요약 + 핵심표현 3개. **한자/일어/노르웨이어 금지**. 오직 한글과 영어만 사용."}] + 
                  [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
         model="llama-3.3-70b-versatile",
     )
-    # 한자/일어 강제 제거 필터
+    # 한자/일어/기타 외국어 문자 강제 제거 필터
     clean_summary = re.sub(r'[一-龥ぁ-ゔァ-ヶー]', '', sum_res.choices[0].message.content)
     st.info(clean_summary)
-    if st.button("돌아가기"): st.session_state.summary_mode = False; st.rerun()
+    if st.button("Back"): st.session_state.summary_mode = False; st.rerun()
     st.stop()
 
-# [6] 지침 (한자/일어 박멸 강조)
+# [6] 시스템 지침 (언어 제한 및 형식 고정)
 JENNY_SYSTEM = f"""너는 24세 재미교포 제니야. 레벨: {user['level']}.
-1. 오직 영어와 한글(Korean Alphabet)만 사용해. 한자(Chinese)와 일본어 절대 금지.
-2. '언니'라 부르지 마. 이름이나 'Bestie' 사용.
-3. 슬랭은 **굵게**, 끝에 [Slang: 단어 - <span class='korean'>뜻</span>] 추가.
-4. 표현은 [[표현: 영어 - <span class='korean'>뜻</span>]] 형식. 한글 뜻은 <span class='korean'> </span> 태그 필수."""
+1. **오직 영어와 한글만 사용해.** 노르웨이어, 한자, 일본어 절대 금지.
+2. 슬랭은 **굵게**, 끝에 [Slang: 단어 - <span class='korean'>뜻</span>] 추가.
+3. 표현은 반드시 [[표현: 영어 - <span class='korean'>뜻</span>]] 이 형식을 지켜줘.
+4. 초보자(Beginner)라면 아주 짧고 쉬운 문장으로만 말해."""
 
 # 로그 출력
 for m in st.session_state.messages:
@@ -98,19 +97,21 @@ if prompt:
     with st.chat_message("user"): st.write(prompt)
 
     try:
-        with st.spinner("Jenny is matching your level..."):
+        with st.spinner("Jenny is matching your vibe..."):
             res = client.chat.completions.create(
                 messages=[{"role": "system", "content": JENNY_SYSTEM}] + 
                          [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
                 model="llama-3.3-70b-versatile",
             )
             raw_ans = res.choices[0].message.content
-            # 한자/일본어 글자 강제 제거 필터
+            # 외국어 문자 제거 필터
             ans = re.sub(r'[一-龥ぁ-ゔァ-ヶー]', '', raw_ans)
             
+            # ⭐ [표현 추출 로직 업그레이드] - '영어: 영어' 같은 오타도 잡아냄
             exps = re.findall(r'\[\[표현:\s*(.*?)\s*\]\]', ans)
             for e in exps:
-                clean_e = re.sub(r'<.*?>', '', e).strip()
+                # 불필요한 태그 제거 및 '영어 - 뜻' 형식으로 정제
+                clean_e = re.sub(r'<.*?>|영어\s*[:|-]\s*', '', e).strip()
                 if clean_e and clean_e not in st.session_state.learned_exps:
                     st.session_state.learned_exps.append(clean_e)
 
