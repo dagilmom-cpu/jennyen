@@ -4,7 +4,7 @@ import requests
 import re
 import base64
 
-# [1] 디자인
+# [1] 디자인 (럭셔리 스타일)
 st.set_page_config(page_title="Jenny's VIP Global Academy", page_icon="🐆", layout="wide")
 st.markdown("""
     <style>
@@ -43,7 +43,7 @@ if "user_info" not in st.session_state:
     with c2:
         level = st.select_slider("Level", options=["Beginner", "Intermediate", "Advanced"])
         interest = st.text_area("Interests", placeholder="e.g. SATC, News, K-pop...")
-    if st.button("Start! 🏄‍♀️"):
+    if st.button("Unlock Your Potential! 🏄‍♀️"):
         if name and interest:
             st.session_state.user_info = {"name": name, "role": role, "level": level, "interest": interest}
             st.rerun()
@@ -51,7 +51,37 @@ if "user_info" not in st.session_state:
 
 user = st.session_state.user_info
 
-# [5] 사이드바 및 요약 로직 (수정됨)
+# ⭐ [최상단 요약 모드 체크] - 요약 모드일 때 채팅창을 아예 안 그리게 함
+if st.session_state.summary_mode:
+    st.balloons()
+    st.title("🎓 Today's Study Recap")
+    
+    if not st.session_state.messages:
+        st.warning("No conversation found to summarize, Bestie! 😅")
+    else:
+        with st.spinner("Jenny is picking the best expressions for you... ✍️"):
+            try:
+                # 요약 전용 프롬프트
+                sum_res = client.chat.completions.create(
+                    messages=[{"role": "system", "content": "너는 힙한 영어 튜터 제니야. 오늘 대화 내용을 3줄의 깔끔한 한국어 평서문으로 요약하고 핵심 표현 3개를 '영어 - 뜻' 형식으로 정리해줘. 한자/일어/특수태그 절대 금지."}] + 
+                             [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
+                    model="llama-3.3-70b-versatile",
+                )
+                raw_summary = sum_res.choices[0].message.content
+                # 찌꺼기 제거 필터
+                clean_summary = re.sub(r'\[Slang:.*?\]|\[\[표현:.*?\]\]|<.*?>|[一-龥ぁ-ゔァ-ヶー]', '', raw_summary)
+                
+                st.success(f"You nailed it today, {user['name']}! 🥂")
+                st.markdown(f"### 📝 Summary\n{clean_summary}")
+            except Exception as e:
+                st.error(f"Error during summary: {e}")
+
+    if st.button("Back to Chat 🏄‍♀️"):
+        st.session_state.summary_mode = False
+        st.rerun()
+    st.stop() # 여기서 멈춰서 아래 채팅창 코드가 실행 안 되게 함!
+
+# [5] 사이드바
 with st.sidebar:
     st.title(f"🐆 {user['name']}'s Studio")
     v_speed = st.slider("🗣️ Voice Speed", 0.5, 2.0, 1.4, 0.1)
@@ -63,43 +93,13 @@ with st.sidebar:
     for e in list(dict.fromkeys(st.session_state.learned_exps)):
         st.write(f"✨ {e}")
 
-# ⭐ [요약 화면 전용 섹션]
-if st.session_state.summary_mode:
-    st.balloons()
-    st.header("🎓 Today's Recap")
-    
-    if not st.session_state.messages:
-        st.warning("아직 대화 내용이 없어서 요약할 게 없어, 언니! 😅")
-    else:
-        with st.spinner("Jenny is writing your study note... ✍️"):
-            try:
-                # 요약 요청 (지침 강화)
-                sum_res = client.chat.completions.create(
-                    messages=[{"role": "system", "content": "너는 깔끔한 영어 튜터 제니야. 오늘 대화 내용을 3줄의 한국어 평서문으로 요약하고 핵심 표현 3개를 '단어 - 뜻' 형식으로 정리해줘. 한자/일어/특수태그 절대 금지."}] + 
-                             [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
-                    model="llama-3.3-70b-versatile",
-                )
-                raw_summary = sum_res.choices[0].message.content
-                # 찌꺼기 제거 필터
-                clean_summary = re.sub(r'\[Slang:.*?\]|\[\[표현:.*?\]\]|<.*?>|[一-龥ぁ-ゔァ-ヶー]', '', raw_summary)
-                
-                st.success(f"You did a great job today, {user['name']}! 🥂")
-                st.markdown(f"### 📝 Summary & Key Points\n{clean_summary}")
-            except Exception as e:
-                st.error(f"요약 중 에러 발생: {e}")
-
-    if st.button("대화로 다시 돌아가기"):
-        st.session_state.summary_mode = False
-        st.rerun()
-    st.stop() # 요약 모드일 때는 대화창이 안 보이게 멈춤
-
 # [6] 시스템 지침
 JENNY_SYSTEM = f"""너는 24세 재미교포 제니야. 레벨: {user['level']}.
 1. 오직 영어와 한글만 사용. 한자/일어/노르웨이어 절대 금지.
 2. 슬랭은 **굵게**, 끝에 [Slang: 단어 - <span class='korean'>뜻</span>] 추가.
 3. 표현은 [[표현: 영어 - <span class='korean'>뜻</span>]] 형식. 한글 뜻은 <span class='korean'> </span> 태그 필수."""
 
-# 로그 출력
+# 로그 출력 (채팅 내역)
 for m in st.session_state.messages:
     if m["role"] != "system":
         with st.chat_message(m["role"]):
@@ -107,13 +107,13 @@ for m in st.session_state.messages:
             if m.get("audio_b64"): st.audio(base64.b64decode(m["audio_b64"]), format="audio/mp3")
 
 # [7] 대화 로직
-prompt = st.chat_input(f"Hi {user['name']}! Say something!")
+prompt = st.chat_input(f"Hey {user['name']}! Ready to slay?")
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt, "display_content": prompt})
     with st.chat_message("user"): st.write(prompt)
 
     try:
-        with st.spinner("Jenny is matching your level..."):
+        with st.spinner("Jenny is typing... 📱"):
             res = client.chat.completions.create(
                 messages=[{"role": "system", "content": JENNY_SYSTEM}] + 
                          [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
