@@ -5,8 +5,8 @@ import re
 import base64
 from datetime import datetime
 
-# [1] 디자인 (변함없는 럭셔리 레오파드)
-st.set_page_config(page_title="Jenny's VIP Global Studio", page_icon="🐆", layout="wide")
+# [1] 디자인 (변함없는 럭셔리 레오파드 & 한글 핑크색)
+st.set_page_config(page_title="Jenny's VIP Global Academy", page_icon="🐆", layout="wide")
 st.markdown("""
     <style>
     .stApp { 
@@ -27,32 +27,44 @@ try:
     VOICE_ID = st.secrets["VOICE_ID"].strip()
     client = Groq(api_key=GROQ_KEY)
 except Exception as e:
-    st.error(f"⚠️ Secrets Check!: {e}"); st.stop()
+    st.error(f"🚨 Secrets 설정 확인 필요!: {e}"); st.stop()
 
 # [3] 세션 초기화
 if "messages" not in st.session_state: st.session_state.messages = []
 if "learned_exps" not in st.session_state: st.session_state.learned_exps = []
 
-# [4] 입학 신청서 (비즈니스/관광 모드 추가)
+# [4] 입학 신청서 (언니가 요청한 6가지 Role 반영!)
 if "user_info" not in st.session_state:
-    st.title("🐆 Welcome to Jenny's VIP Global Studio")
-    st.subheader("Politics, Sitcoms, Business, or K-Pop? Let's talk about EVERYTHING! 🥂")
+    st.title("🐆 Welcome to Jenny's VIP Global Academy")
+    st.subheader("Pick your goal and let's start your premium lesson! 🥂")
+    
     c1, c2 = st.columns(2)
     with c1:
         name = st.text_input("Name", value="maykim")
-        job = st.selectbox("Role", ["Small Business Owner (관광지 소상공인)", "Student", "Professional", "Digital Nomad"])
+        role = st.selectbox("What is your goal today?", [
+            "소상공인 영어 배우기 (Hospitality English)",
+            "미드로 영어 표현 배우기 (Sitcom Vibe)",
+            "비지니스 영어 배우기 (Professional English)",
+            "유창한 영어 배우기 (Fluency & Slang)",
+            "토론 해보기 (Debating & Logic)",
+            "영어 인터뷰 배우기 (Interview Prep)"
+        ])
     with c2:
         level = st.select_slider("English Level", options=["Beginner", "Intermediate", "Advanced"])
-        interest = st.multiselect("Interests", ["Sitcoms (Friends, SATC, etc.)", "Politics & News", "K-Food & Mukbang", "K-Pop", "Business English"])
+        # Interest를 자유롭게 적을 수 있도록 변경!
+        interest = st.text_area("Your Interests (Comma separated)", placeholder="e.g. SATC, HIMYM, Politics, K-pop, Mukbang, Stocks...")
     
     if st.button("Unlock Your Potential! 🏄‍♀️"):
-        st.session_state.user_info = {"name": name, "job": job, "level": level, "interest": interest}
-        st.rerun()
+        if name and interest:
+            st.session_state.user_info = {"name": name, "role": role, "level": level, "interest": interest}
+            st.rerun()
+        else:
+            st.warning("이름과 관심사는 꼭 적어줘야 제니가 맞춤형으로 준비하지! 😉")
     st.stop()
 
 user = st.session_state.user_info
 
-# [5] 사이드바 (원어민 스피드 유지)
+# [5] 사이드바 (기본 속도 1.4배속)
 with st.sidebar:
     st.title(f"🐆 {user['name']}'s Studio")
     v_speed = st.slider("🗣️ Voice Speed", 0.5, 2.0, 1.4, 0.1)
@@ -60,13 +72,16 @@ with st.sidebar:
     st.subheader("📚 Key Expressions")
     for e in st.session_state.learned_exps: st.write(f"✨ {e}")
 
-# 🚀 [학습 핵심] 제니의 데이터 무한 확장!
-JENNY_SYSTEM = f"""너는 24세 재미교포 제니야. 전문 영어 강사이자 세상 모든 핫이슈를 꿰뚫고 있는 ENFP 전문가야.
-[The Guru Persona]
-- 너는 Friends, SATC, HIMYM, The Office, Big Bang Theory의 모든 캐릭터와 유머를 알아.
-- 실시간 글로벌 뉴스, 정치, 경제, K-Pop, 먹방 트렌드에 매우 민감해.
-- 사용자({user['name']})는 {user['job']}이야. 이에 맞춰 관광객 응대 영어(Hospitality English)나 비즈니스 팁을 자연스럽게 섞어줘.
-- 토론(Debating) 시에는 논리적이면서도 힙한 원어민 표현을 써줘.
+# 🚀 [학습 핵심] 제니의 전문성 강화 지침
+JENNY_SYSTEM = f"""너는 24세 재미교포 제니야. 전문 영어 강사이자 ENFP 글로벌 전문가야.
+[User Profile]
+- 이름: {user['name']}, 목적: {user['role']}, 레벨: {user['level']}
+- 관심사: {user['interest']}
+
+[Special Instruction]
+- 사용자가 선택한 '{user['role']}'에 맞춰 전문적인 지식(드라마 대사, 비즈니스 매너, 관광 응대 등)을 활용해.
+- 관심사인 '{user['interest']}'에 대한 실시간 트렌드와 정보를 대화에 섞어줘.
+- 토론이나 인터뷰 모드일 때는 더 논리적이고 세련된 원어민 표현을 써줘.
 
 [Rules]
 1. 사용자를 '언니'라 부르지 마. 이름이나 'Bestie', 'Partner' 등을 써.
@@ -83,13 +98,13 @@ for m in st.session_state.messages:
                 st.audio(base64.b64decode(m["audio_b64"]), format="audio/mp3")
 
 # [6] 대화 로직
-prompt = st.chat_input(f"Hey {user['name']}! What's the hot topic today? 🗞️")
+prompt = st.chat_input(f"Hi {user['name']}! Ready for your {user['role']} session? 🥂")
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt, "display_content": prompt})
     with st.chat_message("user"): st.write(prompt)
 
     try:
-        with st.spinner("Jenny is checking the latest news... 🌐"):
+        with st.spinner("Jenny is catching a wave... 🌊"):
             res = client.chat.completions.create(
                 messages=[{"role": "system", "content": JENNY_SYSTEM}] + 
                          [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
