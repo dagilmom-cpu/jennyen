@@ -19,14 +19,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# [2] API 연결
+# [2] API 연결 (언니 스크린샷 이름 'VOICE_KEY' 반영!)
 try:
     GROQ_KEY = st.secrets["GROQ_API_KEY"].strip()
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"].strip()
-    VOICE_ID = st.secrets["VOICE_ID"].strip()
+    VOICE_ID = st.secrets["VOICE_KEY"].strip() # VOICE_ID에서 VOICE_KEY로 이름 변경!
     client = Groq(api_key=GROQ_KEY)
 except Exception as e:
-    st.error("🚨 API 키 설정(Secrets) 확인 필요!"); st.stop()
+    st.error(f"🚨 Secrets 설정 확인 필요! ({e})"); st.stop()
 
 # [3] 세션 초기화
 if "messages" not in st.session_state: st.session_state.messages = []
@@ -58,7 +58,7 @@ if "user_info" not in st.session_state:
 
 user = st.session_state.user_info
 
-# [5] 사이드바
+# [5] 사이드바 & 수업 종료
 with st.sidebar:
     st.title(f"🐆 {user['name']}'s Studio")
     v_speed = st.slider("🗣️ Voice Speed", 0.5, 2.0, 1.4, 0.1)
@@ -78,20 +78,21 @@ if st.session_state.summary_mode:
                  [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
         model="llama-3.3-70b-versatile",
     )
-    st.info(sum_res.choices[0].message.content)
+    # 프로그래밍적으로 한자/일어 강제 제거
+    clean_summary = re.sub(r'[一-龥ぁ-ゔァ-ヶー]', '', sum_res.choices[0].message.content)
+    st.info(clean_summary)
     if st.button("돌아가기"): st.session_state.summary_mode = False; st.rerun()
     st.stop()
 
 # [6] 시스템 지침 (강력한 언어 제한 추가)
-LEVEL_GUIDE = {"Beginner": "Simple/Short.", "Intermediate": "Standard.", "Advanced": "Native Speed."}
+LEVEL_GUIDE = {"Beginner": "Simple/Short sentences.", "Intermediate": "Standard.", "Advanced": "Native Speed."}
 
-JENNY_SYSTEM = f"""너는 24세 재미교포 제니야.
-[Profile] 이름: {user['name']}, 레벨: {user['level']}
+JENNY_SYSTEM = f"""너는 24세 재미교포 제니야. 레벨: {user['level']}.
 [Language Rule - CRITICAL]
 1. **오직 영어(English)와 한글(Korean Alphabet)만 사용해.**
-2. **한자(Chinese characters)와 일본어(Japanese characters, Hiragana, Katakana) 사용을 엄격히 금지한다.** 뜻 풀이할 때 절대 섞지 마.
+2. **한자(Chinese characters)와 일본어 사용을 엄격히 금지한다.** 뜻 풀이할 때 절대 섞지 마.
 3. 슬랭은 **굵게**, [Slang: 단어 - <span class='korean'>한글뜻</span>] 추가.
-4. 표현은 [[표현: 영어 - <span class='korean'>한글뜻</span>]] 형식. 한글 뜻은 반드시 <span class='korean'> </span> 태그 필수."""
+4. 표현은 [[표현: 영어 - <span class='korean'>한글뜻</span>]] 형식. 한글 뜻은 <span class='korean'> </span> 태그 필수."""
 
 # 로그 출력
 for m in st.session_state.messages:
@@ -113,9 +114,12 @@ if prompt:
                          [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
                 model="llama-3.3-70b-versatile",
             )
-            ans = res.choices[0].message.content
+            raw_ans = res.choices[0].message.content
             
-            # 표현 추출 (유연하게)
+            # ⭐ [핵심 수정] 한자 및 일본어 글자 패턴을 정규식으로 찾아서 공백으로 교체
+            ans = re.sub(r'[一-龥ぁ-ゔァ-ヶー]', '', raw_ans)
+            
+            # 표현 추출
             exps = re.findall(r'\[\[표현:\s*(.*?)\s*\]\]', ans)
             for e in exps:
                 clean_e = re.sub(r'<.*?>', '', e).strip()
@@ -135,8 +139,9 @@ if prompt:
                         json={"text": v_text, "model_id": "eleven_multilingual_v2", "voice_settings": {"stability": 0.45}}
                     )
                     if v_res.status_code == 200:
-                        audio_b64 = base64.b64encode(v_res.content).decode()
-                        st.audio(v_res.content, format="audio/mp3")
+                        audio_data = v_res.content
+                        audio_b64 = base64.b64encode(audio_data).decode()
+                        st.audio(audio_data, format="audio/mp3")
                         md = f"""<audio id="ja" class="hidden-audio" autoplay><source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3"></audio>
                             <script>var a=document.getElementById('ja'); a.playbackRate={v_speed}; a.play();</script>"""
                         st.markdown(md, unsafe_allow_html=True)
