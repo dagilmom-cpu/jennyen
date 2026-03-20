@@ -4,7 +4,7 @@ import requests
 import re
 import base64
 
-# [1] 디자인 (럭셔리 스타일)
+# [1] 디자인 (럭셔리 스타일 고정)
 st.set_page_config(page_title="Jenny's VIP Global Academy", page_icon="🐆", layout="wide")
 st.markdown("""
     <style>
@@ -51,19 +51,20 @@ if "user_info" not in st.session_state:
 
 user = st.session_state.user_info
 
-# ⭐ [최상단 요약 모드 체크] - 요약 모드일 때 채팅창을 아예 안 그리게 함
+# ⭐ [여기가 핵심: 요약 모드 강제 전환]
+# 이 코드가 다른 어떤 UI 요소보다 위에 있어야 확실하게 작동해!
 if st.session_state.summary_mode:
     st.balloons()
-    st.title("🎓 Today's Study Recap")
+    st.title("🎓 Today's Premium Study Recap")
     
     if not st.session_state.messages:
-        st.warning("No conversation found to summarize, Bestie! 😅")
+        st.warning("No conversation to summarize, Bestie! 😅")
     else:
-        with st.spinner("Jenny is picking the best expressions for you... ✍️"):
+        with st.spinner("Jenny is wrapping up your lesson... ✍️"):
             try:
                 # 요약 전용 프롬프트
                 sum_res = client.chat.completions.create(
-                    messages=[{"role": "system", "content": "너는 힙한 영어 튜터 제니야. 오늘 대화 내용을 3줄의 깔끔한 한국어 평서문으로 요약하고 핵심 표현 3개를 '영어 - 뜻' 형식으로 정리해줘. 한자/일어/특수태그 절대 금지."}] + 
+                    messages=[{"role": "system", "content": "너는 럭셔리 영어 튜터 제니야. 오늘 대화 내용을 3줄의 한국어 평서문으로 요약하고 핵심 표현 3개를 '영어 - 뜻' 형식으로 정리해줘. 한자/일어/특수태그 절대 금지."}] + 
                              [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
                     model="llama-3.3-70b-versatile",
                 )
@@ -71,15 +72,15 @@ if st.session_state.summary_mode:
                 # 찌꺼기 제거 필터
                 clean_summary = re.sub(r'\[Slang:.*?\]|\[\[표현:.*?\]\]|<.*?>|[一-龥ぁ-ゔァ-ヶー]', '', raw_summary)
                 
-                st.success(f"You nailed it today, {user['name']}! 🥂")
-                st.markdown(f"### 📝 Summary\n{clean_summary}")
+                st.success(f"Slayed it today, {user['name']}! 🥂")
+                st.info(f"### 📝 Summary & Key Points\n{clean_summary}")
             except Exception as e:
-                st.error(f"Error during summary: {e}")
+                st.error(f"Summary Error: {e}")
 
     if st.button("Back to Chat 🏄‍♀️"):
         st.session_state.summary_mode = False
         st.rerun()
-    st.stop() # 여기서 멈춰서 아래 채팅창 코드가 실행 안 되게 함!
+    st.stop() # 요약 모드일 땐 여기서 실행을 멈춰서 채팅창을 아예 안 그려!
 
 # [5] 사이드바
 with st.sidebar:
@@ -99,7 +100,7 @@ JENNY_SYSTEM = f"""너는 24세 재미교포 제니야. 레벨: {user['level']}.
 2. 슬랭은 **굵게**, 끝에 [Slang: 단어 - <span class='korean'>뜻</span>] 추가.
 3. 표현은 [[표현: 영어 - <span class='korean'>뜻</span>]] 형식. 한글 뜻은 <span class='korean'> </span> 태그 필수."""
 
-# 로그 출력 (채팅 내역)
+# 로그 출력
 for m in st.session_state.messages:
     if m["role"] != "system":
         with st.chat_message(m["role"]):
@@ -107,13 +108,13 @@ for m in st.session_state.messages:
             if m.get("audio_b64"): st.audio(base64.b64decode(m["audio_b64"]), format="audio/mp3")
 
 # [7] 대화 로직
-prompt = st.chat_input(f"Hey {user['name']}! Ready to slay?")
+prompt = st.chat_input(f"Hey {user['name']}! Ready?")
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt, "display_content": prompt})
     with st.chat_message("user"): st.write(prompt)
 
     try:
-        with st.spinner("Jenny is typing... 📱"):
+        with st.spinner("Jenny is matching your level..."):
             res = client.chat.completions.create(
                 messages=[{"role": "system", "content": JENNY_SYSTEM}] + 
                          [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
