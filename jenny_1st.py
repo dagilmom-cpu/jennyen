@@ -5,7 +5,7 @@ import re
 import base64
 from datetime import datetime
 
-# [1] 디자인 (변함없는 럭셔리 레오파드 & 한글 핑크색)
+# [1] 디자인 (럭셔리 배경 & 한글 핑크색 스타일)
 st.set_page_config(page_title="Jenny's VIP Global Academy", page_icon="🐆", layout="wide")
 st.markdown("""
     <style>
@@ -32,12 +32,12 @@ except Exception as e:
 # [3] 세션 초기화
 if "messages" not in st.session_state: st.session_state.messages = []
 if "learned_exps" not in st.session_state: st.session_state.learned_exps = []
+if "summary_mode" not in st.session_state: st.session_state.summary_mode = False
 
-# [4] 입학 신청서 (언니가 요청한 6가지 Role 반영!)
+# [4] 입학 신청서
 if "user_info" not in st.session_state:
     st.title("🐆 Welcome to Jenny's VIP Global Academy")
     st.subheader("Pick your goal and let's start your premium lesson! 🥂")
-    
     c1, c2 = st.columns(2)
     with c1:
         name = st.text_input("Name", value="maykim")
@@ -51,43 +51,56 @@ if "user_info" not in st.session_state:
         ])
     with c2:
         level = st.select_slider("English Level", options=["Beginner", "Intermediate", "Advanced"])
-        # Interest를 자유롭게 적을 수 있도록 변경!
-        interest = st.text_area("Your Interests (Comma separated)", placeholder="e.g. SATC, HIMYM, Politics, K-pop, Mukbang, Stocks...")
+        interest = st.text_area("Your Interests", placeholder="e.g. SATC, News, K-pop...")
     
     if st.button("Unlock Your Potential! 🏄‍♀️"):
         if name and interest:
             st.session_state.user_info = {"name": name, "role": role, "level": level, "interest": interest}
             st.rerun()
-        else:
-            st.warning("이름과 관심사는 꼭 적어줘야 제니가 맞춤형으로 준비하지! 😉")
     st.stop()
 
 user = st.session_state.user_info
 
-# [5] 사이드바 (기본 속도 1.4배속)
+# [5] 사이드바 & 수업 종료 버튼
 with st.sidebar:
     st.title(f"🐆 {user['name']}'s Studio")
     v_speed = st.slider("🗣️ Voice Speed", 0.5, 2.0, 1.4, 0.1)
     st.divider()
-    st.subheader("📚 Key Expressions")
+    
+    # [수업 종료 버튼 추가]
+    if st.button("🏁 수업 종료 (오늘 내용 요약)"):
+        st.session_state.summary_mode = True
+
+    st.divider()
+    st.subheader("📚 Today's Expressions")
     for e in st.session_state.learned_exps: st.write(f"✨ {e}")
 
-# 🚀 [학습 핵심] 제니의 전문성 강화 지침
+# [수업 종료 요약 로직]
+if st.session_state.summary_mode:
+    st.balloons()
+    st.title("🎓 Today's Lesson Summary")
+    with st.spinner("Jenny is summarizing your progress..."):
+        sum_res = client.chat.completions.create(
+            messages=[{"role": "system", "content": "오늘 대화 내용을 3줄로 요약하고, 핵심 표현 3개를 한글 뜻과 함께 정리해줘. 한자는 절대 사용하지 마."}] + 
+                     [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
+            model="llama-3.3-70b-versatile",
+        )
+        st.success(f"Great job today, {user['name']}! Here's your recap:")
+        st.markdown(sum_res.choices[0].message.content)
+        if st.button("돌아가기"):
+            st.session_state.summary_mode = False
+            st.rerun()
+    st.stop()
+
+# [6] 제니 시스템 지침 (한자 제외 규칙 추가)
 JENNY_SYSTEM = f"""너는 24세 재미교포 제니야. 전문 영어 강사이자 ENFP 글로벌 전문가야.
-[User Profile]
-- 이름: {user['name']}, 목적: {user['role']}, 레벨: {user['level']}
-- 관심사: {user['interest']}
-
-[Special Instruction]
-- 사용자가 선택한 '{user['role']}'에 맞춰 전문적인 지식(드라마 대사, 비즈니스 매너, 관광 응대 등)을 활용해.
-- 관심사인 '{user['interest']}'에 대한 실시간 트렌드와 정보를 대화에 섞어줘.
-- 토론이나 인터뷰 모드일 때는 더 논리적이고 세련된 원어민 표현을 써줘.
-
-[Rules]
+[User Profile] 목적: {user['role']}, 관심사: {user['interest']}
+[Instructions]
 1. 사용자를 '언니'라 부르지 마. 이름이나 'Bestie', 'Partner' 등을 써.
 2. 첫 인사만 한국어, 이후 100% 영어.
-3. 슬랭/신조어는 **굵게**, 끝에 [Slang: 단어 - <span class='korean'>한글뜻</span>] 추가.
-4. 표현은 [[표현: 영어 - <span class='korean'>한글뜻</span>]] 형식. 한글은 <span class='korean'> </span>로 감싸줘."""
+3. 슬랭은 **굵게**, 끝에 [Slang: 단어 - <span class='korean'>한글뜻</span>] 추가.
+4. 표현은 [[표현: 영어 - <span class='korean'>한글뜻</span>]] 형식. 한글은 <span class='korean'> </span>로 감싸줘.
+5. **CRITICAL: 답변에 한자(Chinese characters)를 절대 사용하지 마. 오직 영어와 한국어(한글)만 사용해.**"""
 
 # 로그 출력
 for m in st.session_state.messages:
@@ -97,7 +110,7 @@ for m in st.session_state.messages:
             if m.get("audio_b64"):
                 st.audio(base64.b64decode(m["audio_b64"]), format="audio/mp3")
 
-# [6] 대화 로직
+# [7] 대화 로직
 prompt = st.chat_input(f"Hi {user['name']}! Ready for your {user['role']} session? 🥂")
 if prompt:
     st.session_state.messages.append({"role": "user", "content": prompt, "display_content": prompt})
