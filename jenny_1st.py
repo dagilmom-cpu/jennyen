@@ -19,15 +19,14 @@ st.markdown("""
     </style>
     """, unsafe_allow_html=True)
 
-# [2] API 연결 (언니의 GitHub Secrets 이름과 100% 동기화)
+# [2] API 연결
 try:
     GROQ_KEY = st.secrets["GROQ_API_KEY"].strip()
     ELEVEN_KEY = st.secrets["ELEVENLABS_API_KEY"].strip()
-    VOICE_ID = st.secrets["VOICE_KEY"].strip() # VOICE_KEY로 이름 변경 완료!
+    VOICE_ID = st.secrets["VOICE_ID"].strip()
     client = Groq(api_key=GROQ_KEY)
 except Exception as e:
-    st.error(f"🚨 Secrets 이름 확인 필요: {e}")
-    st.stop()
+    st.error("🚨 API 키 설정(Secrets) 확인 필요!"); st.stop()
 
 # [3] 세션 초기화
 if "messages" not in st.session_state: st.session_state.messages = []
@@ -59,11 +58,10 @@ if "user_info" not in st.session_state:
 
 user = st.session_state.user_info
 
-# [5] 사이드바 & 종료 버튼
+# [5] 사이드바
 with st.sidebar:
     st.title(f"🐆 {user['name']}'s Studio")
     v_speed = st.slider("🗣️ Voice Speed", 0.5, 2.0, 1.4, 0.1)
-    st.divider()
     if st.button("🏁 수업 종료 및 요약하기"):
         st.session_state.summary_mode = True
         st.rerun()
@@ -72,28 +70,28 @@ with st.sidebar:
     for e in list(dict.fromkeys(st.session_state.learned_exps)):
         st.write(f"✨ {e}")
 
-# [요약 모드] 외국어(한자/일어) 차단
+# [요약 모드] 한자/일본어 차단 강화
 if st.session_state.summary_mode:
     st.balloons()
     sum_res = client.chat.completions.create(
-        messages=[{"role": "system", "content": "3줄 요약 + 핵심표현 3개. **한자(Chinese)나 일본어 절대 금지**. 오직 한글과 영어만 사용."}] + 
+        messages=[{"role": "system", "content": "3줄 요약 + 핵심표현 3개. **중요: 한자(Chinese)나 일본어(Japanese)를 1%도 섞지 마.** 오직 한글과 영어만 사용해."}] + 
                  [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
         model="llama-3.3-70b-versatile",
     )
-    clean_summary = re.sub(r'[一-龥ぁ-ゔァ-ヶー]', '', sum_res.choices[0].message.content)
-    st.info(clean_summary)
+    st.info(sum_res.choices[0].message.content)
     if st.button("돌아가기"): st.session_state.summary_mode = False; st.rerun()
     st.stop()
 
-# [6] 시스템 지침 (강력한 언어 제한)
-LEVEL_GUIDE = {"Beginner": "Very simple, short sentences. Limit vocabulary.", "Intermediate": "Standard English.", "Advanced": "Native speed."}
-JENNY_SYSTEM = f"""너는 24세 재미교포 제니야. 레벨: {user['level']}.
-[CRITICAL RULE]
-1. 오직 영어와 한글(Korean Alphabet)만 사용해.
-2. 한자(Chinese)와 일본어(Japanese)를 1%도 섞지 마. 발견되면 즉시 삭제해.
-3. '언니'라 부르지 마. 이름이나 'Bestie' 사용.
-4. 슬랭은 **굵게**, 끝에 [Slang: 단어 - <span class='korean'>한글뜻</span>] 추가.
-5. 표현은 [[표현: 영어 - <span class='korean'>한글뜻</span>]] 형식. 한글 뜻은 <span class='korean'> </span> 태그 필수."""
+# [6] 시스템 지침 (강력한 언어 제한 추가)
+LEVEL_GUIDE = {"Beginner": "Simple/Short.", "Intermediate": "Standard.", "Advanced": "Native Speed."}
+
+JENNY_SYSTEM = f"""너는 24세 재미교포 제니야.
+[Profile] 이름: {user['name']}, 레벨: {user['level']}
+[Language Rule - CRITICAL]
+1. **오직 영어(English)와 한글(Korean Alphabet)만 사용해.**
+2. **한자(Chinese characters)와 일본어(Japanese characters, Hiragana, Katakana) 사용을 엄격히 금지한다.** 뜻 풀이할 때 절대 섞지 마.
+3. 슬랭은 **굵게**, [Slang: 단어 - <span class='korean'>한글뜻</span>] 추가.
+4. 표현은 [[표현: 영어 - <span class='korean'>한글뜻</span>]] 형식. 한글 뜻은 반드시 <span class='korean'> </span> 태그 필수."""
 
 # 로그 출력
 for m in st.session_state.messages:
@@ -115,10 +113,9 @@ if prompt:
                          [{"role": m["role"], "content": m["content"]} for m in st.session_state.messages],
                 model="llama-3.3-70b-versatile",
             )
-            raw_ans = res.choices[0].message.content
-            # ⭐ [한자/일본어 강제 제거 필터]
-            ans = re.sub(r'[一-龥ぁ-ゔァ-ヶー]', '', raw_ans)
+            ans = res.choices[0].message.content
             
+            # 표현 추출 (유연하게)
             exps = re.findall(r'\[\[표현:\s*(.*?)\s*\]\]', ans)
             for e in exps:
                 clean_e = re.sub(r'<.*?>', '', e).strip()
@@ -138,13 +135,12 @@ if prompt:
                         json={"text": v_text, "model_id": "eleven_multilingual_v2", "voice_settings": {"stability": 0.45}}
                     )
                     if v_res.status_code == 200:
-                        audio_data = v_res.content
-                        audio_b64 = base64.b64encode(audio_data).decode()
-                        st.audio(audio_data, format="audio/mp3")
+                        audio_b64 = base64.b64encode(v_res.content).decode()
+                        st.audio(v_res.content, format="audio/mp3")
                         md = f"""<audio id="ja" class="hidden-audio" autoplay><source src="data:audio/mp3;base64,{audio_b64}" type="audio/mp3"></audio>
                             <script>var a=document.getElementById('ja'); a.playbackRate={v_speed}; a.play();</script>"""
                         st.markdown(md, unsafe_allow_html=True)
             
             st.session_state.messages.append({"role": "assistant", "content": ans, "display_content": display_ans, "audio_b64": audio_b64})
     except Exception as e:
-        st.error(f"🚨 Error: {e}")
+        st.error(f"🚨 시스템 에러: {e}")
