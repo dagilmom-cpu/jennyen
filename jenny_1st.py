@@ -138,6 +138,6 @@ if st.sidebar.button("🏁 오늘 수업 끝 (요약하기)"):
     # 요약 기능도 Groq로 처리
     summary_req = client.chat.completions.create(
         messages=[{"role": "system", "content": "대화 내용을 3줄로 요약하고 오늘 배운 핵심 단어 3개를 정리해줘."}] + st.session_state.messages,
-        model="llama3-8b-8192", # 요약은 가벼운 모델로 빠르게!
+        model="model="llama-3.3-70b-versatile", # 요약은 가벼운 모델로 빠르게!
     )
     st.sidebar.write(summary_req.choices[0].message.content)
